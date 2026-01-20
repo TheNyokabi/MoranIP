@@ -3,14 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { 
-  BarChart3, 
-  Users, 
-  ShoppingCart, 
-  Briefcase, 
-  Hammer, 
+import {
+  BarChart3,
+  Users,
+  ShoppingCart,
+  Briefcase,
+  Hammer,
   CheckSquare,
-  ArrowRight 
+  ArrowRight
 } from 'lucide-react';
 
 interface ModuleCard {
@@ -110,24 +110,36 @@ export function ModulesDashboard({ tenantSlug }: ModulesDashboardProps) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Button variant="outline" size="sm">
-              Create New Invoice
-            </Button>
-            <Button variant="outline" size="sm">
-              Add Lead
-            </Button>
-            <Button variant="outline" size="sm">
-              Record Attendance
-            </Button>
-            <Button variant="outline" size="sm">
-              Create Work Order
-            </Button>
-            <Button variant="outline" size="sm">
-              New Task
-            </Button>
-            <Button variant="outline" size="sm">
-              View Reports
-            </Button>
+            <Link href={`/w/${tenantSlug}/invoices/new`}>
+              <Button variant="outline" size="sm" className="w-full">
+                Create New Invoice
+              </Button>
+            </Link>
+            <Link href={`/w/${tenantSlug}/modules/crm`}>
+              <Button variant="outline" size="sm" className="w-full">
+                Add Lead
+              </Button>
+            </Link>
+            <Link href={`/w/${tenantSlug}/hr`}>
+              <Button variant="outline" size="sm" className="w-full">
+                Record Attendance
+              </Button>
+            </Link>
+            <Link href={`/w/${tenantSlug}/modules/manufacturing`}>
+              <Button variant="outline" size="sm" className="w-full">
+                Create Work Order
+              </Button>
+            </Link>
+            <Link href={`/w/${tenantSlug}/modules/projects`}>
+              <Button variant="outline" size="sm" className="w-full">
+                New Task
+              </Button>
+            </Link>
+            <Link href={`/w/${tenantSlug}/reports`}>
+              <Button variant="outline" size="sm" className="w-full">
+                View Reports
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
