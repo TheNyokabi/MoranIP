@@ -19,7 +19,28 @@ function getCookieValue(name: string): string | null {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-    const [queryClient] = React.useState(() => new QueryClient())
+    const [queryClient] = React.useState(() => new QueryClient({
+        defaultOptions: {
+            queries: {
+                // Data is considered fresh for 5 minutes
+                staleTime: 5 * 60 * 1000,
+                // Cache is garbage collected after 10 minutes
+                gcTime: 10 * 60 * 1000,
+                // Refetch on window focus for fresh data
+                refetchOnWindowFocus: true,
+                // Don't refetch when mounting if data is fresh
+                refetchOnMount: 'always',
+                // Retry failed requests up to 2 times
+                retry: 2,
+                // Don't retry on 401/403 errors
+                retryOnMount: true,
+            },
+            mutations: {
+                // Retry mutations once on failure
+                retry: 1,
+            },
+        },
+    }))
     const token = useAuthStore((s) => s.token)
 
     React.useEffect(() => {
