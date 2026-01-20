@@ -789,11 +789,45 @@ async def create_invoice(
             "description": f"VAT {vat_service.default_vat_rate}%"
         })
     
-    # Prepare payments
-    payments_data = [
-        {"mode_of_payment": p.mode_of_payment, "amount": p.amount}
-        for p in invoice.payments
-    ]
+    # Prepare payments with account mapping
+    def resolve_payment_account(mode: str) -> Optional[str]:
+        if not payment_accounts:
+            return None
+        if mode in payment_accounts:
+            return payment_accounts.get(mode)
+        # Case-insensitive match
+        for key, value in payment_accounts.items():
+            if isinstance(key, str) and key.lower() == mode.lower():
+                return value
+        # Fallback to default or first available account
+        if isinstance(payment_accounts, dict):
+            if payment_accounts.get("default"):
+                return payment_accounts.get("default")
+            for value in payment_accounts.values():
+                if value:
+                    return value
+        return None
+
+    payments_data = []
+    for p in invoice.payments:
+        account = resolve_payment_account(p.mode_of_payment)
+        if not account:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "type": "payment_account_missing",
+                    "message": f"No account configured for payment mode '{p.mode_of_payment}'",
+                    "payment_mode": p.mode_of_payment,
+                    "payment_accounts": payment_accounts
+                }
+            )
+        payments_data.append(
+            {
+                "mode_of_payment": p.mode_of_payment,
+                "amount": p.amount,
+                "account": account
+            }
+        )
     
     # Validate payment amounts sum to grand total
     total_payments = sum(p.amount for p in invoice.payments)

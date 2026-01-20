@@ -1147,6 +1147,23 @@ phase_9_pos_profile_setup() {
     local phase_start=$(date +%s)
     log_test_phase "POS Profile Setup" "start"
     
+    # Resolve payment accounts for POS profile (Cash/Mpesa)
+    local accounts_response=$(make_request "GET" "/accounting/accounts?company=${COMPANY_NAME}" "" "$ADMIN_TOKEN")
+    local accounts_http_code=$(get_http_code "$accounts_response")
+    local cash_account=""
+    local mpesa_account=""
+    if [ "$accounts_http_code" -eq 200 ]; then
+        cash_account=$(get_response_body "$accounts_response" | jq -r '.data[] | select(.account_name | test("cash|bank"; "i")) | .account_name' | head -1)
+        mpesa_account=$(get_response_body "$accounts_response" | jq -r '.data[] | select(.account_name | test("mpesa|m-pesa|mobile"; "i")) | .account_name' | head -1)
+    fi
+    if [ -z "$cash_account" ] || [ "$cash_account" = "null" ]; then
+        log_info "Cash account not found, using fallback account for payments"
+        cash_account="$mpesa_account"
+    fi
+    if [ -z "$mpesa_account" ] || [ "$mpesa_account" = "null" ]; then
+        mpesa_account="$cash_account"
+    fi
+
     # Create POS Profile
     log_info "Creating POS Profile: ${POS_PROFILE_NAME}..."
     local profile_data=$(jq -n \
@@ -1155,6 +1172,8 @@ phase_9_pos_profile_setup() {
         --arg company "$COMPANY_NAME" \
         --arg cash_mode "$POS_PAYMENT_MODE_CASH" \
         --arg mpesa_mode "$POS_PAYMENT_MODE_MPESA" \
+        --arg cash_account "$cash_account" \
+        --arg mpesa_account "$mpesa_account" \
         '{
             name: $name,
             warehouse: $warehouse,
@@ -1169,6 +1188,11 @@ phase_9_pos_profile_setup() {
                     enabled: true
                 }
             ],
+            payment_accounts: {
+                ($cash_mode): $cash_account,
+                ($mpesa_mode): $mpesa_account,
+                "default": $cash_account
+            },
             session_settings: {
                 allow_negative_stock: false,
                 require_customer: false
