@@ -24,19 +24,21 @@ Verify Integration Channel (With Token)
         IF    '${engine}' != 'odoo'
             Continue For Loop
         END
-        ${tenant_id}=    Get From Dictionary    ${t}    id
-        Exit For Loop
+        ${candidate_tenant_id}=    Get From Dictionary    ${t}    id
+        ${tenant_login_body}=    Create Dictionary
+        ...    email=${ADMIN_EMAIL}
+        ...    password=${ADMIN_PASSWORD}
+        ...    tenant_id=${candidate_tenant_id}
+        ${candidate_resp}=    POST On Session    moran_api    /api/auth/v1/login-with-tenant
+        ...    json=${tenant_login_body}    headers=${headers}    expected_status=any
+        IF    ${candidate_resp.status_code} == 200
+            ${tenant_id}=    Set Variable    ${candidate_tenant_id}
+            ${token}=    Get From Dictionary    ${candidate_resp.json()}    access_token
+            Exit For Loop
+        END
     END
     Run Keyword If    '${tenant_id}' == '${EMPTY}'
     ...    Skip    No Odoo tenant available for ${ADMIN_EMAIL}; skipping Odoo integration check.
-
-    ${tenant_login_body}=    Create Dictionary
-    ...    email=${ADMIN_EMAIL}
-    ...    password=${ADMIN_PASSWORD}
-    ...    tenant_id=${tenant_id}
-    ${resp_scoped}=    POST On Session    moran_api    /api/auth/v1/login-with-tenant
-    ...    json=${tenant_login_body}    headers=${headers}    expected_status=200
-    ${token}=    Get From Dictionary    ${resp_scoped.json()}    access_token
     
     # 2. Call ERP Endpoint with Bearer Token
     ${auth_header}=     Create Dictionary    Authorization=Bearer ${token}    X-Tenant-ID=${tenant_id}

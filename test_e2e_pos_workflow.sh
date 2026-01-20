@@ -142,15 +142,15 @@ phase_1_authentication() {
     # Try platform admin login as optional step (for future use)
     if [ -n "$PLATFORM_ADMIN_EMAIL" ] && [ -n "$PLATFORM_ADMIN_PASSWORD" ]; then
         log_info "Attempting platform admin login (optional)..."
-        local login_data=$(jq -n \
-            --arg email "$PLATFORM_ADMIN_EMAIL" \
-            --arg password "$PLATFORM_ADMIN_PASSWORD" \
-            '{
-                email: $email,
-                password: $password
-            }')
-        
-        local response=$(make_request "POST" "/auth/v1/login-with-tenant" "$login_data" "")
+    local login_data=$(jq -n \
+        --arg email "$PLATFORM_ADMIN_EMAIL" \
+        --arg password "$PLATFORM_ADMIN_PASSWORD" \
+        '{
+            email: $email,
+            password: $password
+        }')
+    
+    local response=$(make_request "POST" "/auth/v1/login-with-tenant" "$login_data" "")
         if assert_status_code "$response" "200" "Platform admin login (optional)"; then
             local token=$(extract_field "$response" "access_token")
             if [ -n "$token" ]; then
@@ -226,14 +226,14 @@ phase_2_workspace_creation() {
         
         if [ -z "$TENANT_ID" ] || [ "$TENANT_ID" = "null" ]; then
             log_error "Tenant exists but could not retrieve ID"
-            return 1
-        fi
+                return 1
+            fi
         COMPANY_NAME="${TENANT_NAME}"
         log_success "Using existing tenant: ${TENANT_ID}"
-    else
+        else
         log_error "Tenant creation failed (HTTP $http_code)"
         log_error "Response: $(get_response_body "$response")"
-        return 1
+            return 1
     fi
     
     COMPANY_NAME="$TENANT_NAME"
@@ -816,6 +816,21 @@ phase_7_stock_entry() {
     local phase_start=$(date +%s)
     log_test_phase "Stock Entry" "start"
     
+    # Capture baseline stock balances before receipt
+    local warehouse_param=$(echo "$WAREHOUSE_MAIN_ID" | sed 's/ /%20/g')
+    local response=$(make_request "GET" "/pos/items/${ITEM_IPHONE_CODE}/stock?warehouse=${warehouse_param}" "" "$ADMIN_TOKEN")
+    if assert_status_code "$response" "200" "Get iPhone stock (baseline)"; then
+        BASE_STOCK_MAIN_IPHONE=$(extract_field "$response" "qty")
+    fi
+    response=$(make_request "GET" "/pos/items/${ITEM_IPAD_CODE}/stock?warehouse=${warehouse_param}" "" "$ADMIN_TOKEN")
+    if assert_status_code "$response" "200" "Get iPad stock (baseline)"; then
+        BASE_STOCK_MAIN_IPAD=$(extract_field "$response" "qty")
+    fi
+    response=$(make_request "GET" "/pos/items/${ITEM_MACBOOK_CODE}/stock?warehouse=${warehouse_param}" "" "$ADMIN_TOKEN")
+    if assert_status_code "$response" "200" "Get MacBook stock (baseline)"; then
+        BASE_STOCK_MAIN_MACBOOK=$(extract_field "$response" "qty")
+    fi
+    
     # Main Store Stock Entry
     log_info "Adding stock to Main Store..."
     local stock_data=$(jq -n \
@@ -885,22 +900,7 @@ phase_7_stock_entry() {
         log_success "Stock entry submitted"
     fi
         
-    # Capture baseline stock balances before receipt
-    local warehouse_param=$(echo "$WAREHOUSE_MAIN_ID" | sed 's/ /%20/g')
-    local response=$(make_request "GET" "/pos/items/${ITEM_IPHONE_CODE}/stock?warehouse=${warehouse_param}" "" "$ADMIN_TOKEN")
-    if assert_status_code "$response" "200" "Get iPhone stock (baseline)"; then
-        BASE_STOCK_MAIN_IPHONE=$(extract_field "$response" "qty")
-    fi
-    response=$(make_request "GET" "/pos/items/${ITEM_IPAD_CODE}/stock?warehouse=${warehouse_param}" "" "$ADMIN_TOKEN")
-    if assert_status_code "$response" "200" "Get iPad stock (baseline)"; then
-        BASE_STOCK_MAIN_IPAD=$(extract_field "$response" "qty")
-    fi
-    response=$(make_request "GET" "/pos/items/${ITEM_MACBOOK_CODE}/stock?warehouse=${warehouse_param}" "" "$ADMIN_TOKEN")
-    if assert_status_code "$response" "200" "Get MacBook stock (baseline)"; then
-        BASE_STOCK_MAIN_MACBOOK=$(extract_field "$response" "qty")
-    fi
-
-    # Verify stock balances
+        # Verify stock balances
     log_info "Verifying stock balances..."
     POST_STOCK_MAIN_IPHONE=$(echo "$BASE_STOCK_MAIN_IPHONE + $STOCK_MAIN_IPHONE_QTY" | bc)
     POST_STOCK_MAIN_IPAD=$(echo "$BASE_STOCK_MAIN_IPAD + $STOCK_MAIN_IPAD_QTY" | bc)
@@ -1412,7 +1412,7 @@ phase_12_gl_verification() {
             # Verify GL entries balance
     if ! validate_gl_balance "$entries_list"; then
         return 1
-    fi
+            fi
             
             # Verify VAT entry exists
     local vat_found=false
@@ -1561,10 +1561,10 @@ phase_15_validation_checks() {
         local response=$(make_request_with_base "GET" "/erpnext/resource/Sales%20Invoice/${INVOICE_NAME}" "" "$ADMIN_TOKEN" "${BASE_URL}")
         local http_code=$(get_http_code "$response")
         if [ "$http_code" -eq 200 ]; then
-            local docstatus=$(extract_field "$response" "data.docstatus")
-            if [ "$docstatus" = "1" ]; then
-                log_success "ERPNext invoice is submitted (docstatus=1)"
-            else
+        local docstatus=$(extract_field "$response" "data.docstatus")
+        if [ "$docstatus" = "1" ]; then
+            log_success "ERPNext invoice is submitted (docstatus=1)"
+        else
                 log_info "ERPNext invoice exists but not submitted (docstatus=$docstatus)"
             fi
         elif [ "$http_code" -eq 404 ]; then

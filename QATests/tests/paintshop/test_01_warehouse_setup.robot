@@ -78,11 +78,11 @@ TC003_Add_Initial_Stock_Successfully
     ${stock_entry_name}=    Run Keyword If    ${has_name}    Get From Dictionary    ${data}    name
     ...    ELSE    Set Variable    ${EMPTY}
     
-    # Only submit if we have a valid name
-    Run Keyword If    '${stock_entry_name}' != '${EMPTY}'
-    ...    Run Keywords
-    ...    ${submit_response}=    Submit ERPNext Document    Stock Entry    ${stock_entry_name}
-    ...    Verify Response Status    ${submit_response}    200
+    IF    '${stock_entry_name}' == '${EMPTY}'
+        Fail    Stock Entry creation did not return a document name; cannot submit.
+    END
+    ${submit_response}=    Submit ERPNext Document    Stock Entry    ${stock_entry_name}
+    Verify Response Status    ${submit_response}    200
     
     [Teardown]    Run Keywords
     ...    Run Keyword And Ignore Error    Cleanup Test Data    Stock Entry    ${stock_entry_name}    AND
@@ -108,11 +108,11 @@ TC004_Verify_Stock_Balance_Via_Bin_API
     ${stock_entry_name}=    Run Keyword If    ${has_name}    Get From Dictionary    ${stock_data}    name
     ...    ELSE    Set Variable    ${EMPTY}
     
-    # Only submit if we have a valid name
-    Run Keyword If    '${stock_entry_name}' != '${EMPTY}'
-    ...    Run Keywords
-    ...    ${submit_response}=    Submit ERPNext Document    Stock Entry    ${stock_entry_name}
-    ...    Verify Response Status    ${submit_response}    200
+    IF    '${stock_entry_name}' == '${EMPTY}'
+        Fail    Stock Entry creation did not return a document name; cannot submit.
+    END
+    ${submit_response}=    Submit ERPNext Document    Stock Entry    ${stock_entry_name}
+    Verify Response Status    ${submit_response}    200
     
     # Get stock balance - use warehouse name from response
     ${response}=    Get Stock Balance    ${unique_item}    ${warehouse_name_full}

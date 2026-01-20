@@ -155,16 +155,16 @@ async def get_item_stock(
     
     try:
         # Try using the ERPNext method first
-    params = {"item_code": item_code}
-    if warehouse:
-        params["warehouse"] = warehouse
-    
-    stock = erpnext_adapter.proxy_request(
-        tenant_id=tenant_id,
-        path="method/erpnext.stock.utils.get_stock_balance",
-        method="GET",
-        params=params
-    )
+        params = {"item_code": item_code}
+        if warehouse:
+            params["warehouse"] = warehouse
+
+        stock = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="method/erpnext.stock.utils.get_stock_balance",
+            method="GET",
+            params=params
+        )
         
         # Handle different response formats
         if isinstance(stock, dict):
@@ -883,12 +883,12 @@ async def create_invoice(
     
     # Send to ERPNext
     try:
-    result = erpnext_adapter.proxy_request(
-        tenant_id=tenant_id,
-        path="resource/Sales Invoice",
-        method="POST",
-        json_data=payload
-    )
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="resource/Sales Invoice",
+            method="POST",
+            json_data=payload
+        )
         logger.info(f"Invoice created successfully for tenant {tenant_id}, customer {invoice.customer}")
     except HTTPException:
         raise
@@ -1029,12 +1029,12 @@ async def get_cash_summary(
         params["to_date"] = to_date
     
     try:
-    result = erpnext_adapter.proxy_request(
-        tenant_id=tenant_id,
-        path="method/paint_shop_custom.get_cash_summary",
-        method="GET",
-        params=params
-    )
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="method/paint_shop_custom.get_cash_summary",
+            method="GET",
+            params=params
+        )
         return ResponseNormalizer.normalize_erpnext(result)
     except Exception:
         # Fallback when custom method is unavailable
@@ -1092,10 +1092,10 @@ async def get_daily_summary(
     # Get sales invoices - use basic fields only to avoid ERPNext field issues
     invoice_fields = ["name", "grand_total", "customer", "posting_date"]
     try:
-    invoices = erpnext_adapter.proxy_request(
-        tenant_id=tenant_id,
-        path="resource/Sales Invoice",
-        method="GET",
+        invoices = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="resource/Sales Invoice",
+            method="GET",
             params={
                 "limit_page_length": 500,
                 "fields": json.dumps(invoice_fields),
