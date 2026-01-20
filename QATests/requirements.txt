@@ -1,0 +1,6 @@
+robotframework==6.1.1
+robotframework-requests==0.9.5
+robotframework-databaselibrary==1.2.4
+PyMySQL==1.1.0
+robotframework-browser==17.5.2
+robotframework-datadriver

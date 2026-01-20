@@ -1,0 +1,258 @@
+# =====================================
+# MoranERP Git Ignore Configuration
+# =====================================
+
+# ============ Python / Backend ============
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# dotenv
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ============ Node.js / Frontend ============
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+
+# Production build
+build/
+dist/
+
+# Package lock files (optional - uncomment if you want to commit package-lock)
+# package-lock.json
+
+# Testing
+coverage/
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local dev
+.vercel
+.turbo
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# ============ IDE / Editors ============
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains (PyCharm, WebStorm, IntelliJ)
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+
+# ============ OS Files ============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.directory
+
+# ============ Docker ============
+# Docker Compose override files
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ============ Database ============
+*.db
+*.sqlite
+*.sqlite3
+
+# ============ Secrets / Credentials ============
+secrets/
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+credentials.json
+service-account.json
+*_secret*
+*_credentials*
+
+# ============ Logs ============
+logs/
+*.log
+log/
+
+# ============ Temporary Files ============
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+
+# ============ Test Output ============
+test_output/
+test_logs/
+*.out
+*.exit
+
+# ============ Robot Framework ============
+output.xml
+log.html
+report.html
+selenium-screenshot-*.png
+
+# ============ Project-Specific ============
+# Alembic migration temporary files
+alembic/versions/__pycache__/
+
+# Cookie files
+cookies.txt
+cookies2.txt
+
+# Script outputs
+*.out
+*.exit
+
+# ERPNext/Frappe (if local dev)
+sites/*/private/
+sites/*/public/files/
+sites/*/site_config.json
+sites/*/task-logs/
+sites/common_site_config.json
+
+# Monitoring
+monitoring/*.log
+
+# ============ Allow These ============
+# Allow example env files
+!.env.example
+!.env.sample
+
+# Allow specific config files
+!docker-compose.yml
+!Dockerfile
+!*.example
+Engine/ERPNext/erpnext
+Engine/ERPNext/frappe

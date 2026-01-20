@@ -1,0 +1,1788 @@
+{
+	"info": {
+		"_postman_id": "moran-pos-api-collection",
+		"name": "MoranERP POS API",
+		"description": "Complete Postman collection for MoranERP Point of Sale (POS) API endpoints.\n\nIncludes:\n- Main POS operations (invoices, items, customers)\n- Quick Actions\n- M-Pesa Payments\n- Receipts & Printing\n- Offline Sync\n- Analytics\n- Loyalty Programs\n- Layaway/Installments\n\n**Setup Instructions:**\n1. Import this collection into Postman\n2. Import the environment file (MoranERP_POS_API.postman_environment.json)\n3. Set environment variables:\n   - `base_url`: http://localhost:9000 (backend API)\n   - `api_base_url`: http://localhost:4000/api (frontend proxy)\n   - `tenant_id`: Your tenant UUID\n   - `auth_token`: Your JWT token (auto-set by login)\n4. Start with Authentication > Login to get your token\n\n**New Features:**\n- M-Pesa STK Push integration\n- Thermal receipt generation\n- Loyalty points system\n- Layaway/partial payments\n- Offline transaction sync\n- Multi-language receipts\n- Barcode scanning support",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.access_token);",
+									"        pm.collectionVariables.set('auth_token', jsonData.access_token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@moran.com\",\n    \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/auth/login",
+							"host": ["{{api_base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login to get JWT token. Token will be automatically saved to environment variable `auth_token`."
+					}
+				}
+			]
+		},
+		{
+			"name": "Main POS",
+			"item": [
+				{
+					"name": "Items",
+					"item": [
+						{
+							"name": "List Items",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/items",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "items"]
+								}
+							}
+						},
+						{
+							"name": "Get Item",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/items/:item_code",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "items", ":item_code"],
+									"variable": [
+										{
+											"key": "item_code",
+											"value": "ITEM-001"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Item Stock",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/items/:item_code/stock?warehouse=Main Warehouse",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "items", ":item_code", "stock"],
+									"query": [
+										{
+											"key": "warehouse",
+											"value": "Main Warehouse",
+											"disabled": true
+										}
+									],
+									"variable": [
+										{
+											"key": "item_code",
+											"value": "ITEM-001"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Customers",
+					"item": [
+						{
+							"name": "List Customers",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/customers",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "customers"]
+								}
+							}
+						},
+						{
+							"name": "Create Customer",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"customer_name\": \"John Doe\",\n    \"customer_type\": \"Individual\",\n    \"customer_group\": \"Direct\",\n    \"phone\": \"+254712345678\",\n    \"email\": \"john@example.com\"\n}"
+								},
+								"url": {
+									"raw": "{{api_base_url}}/pos/customers",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "customers"]
+								}
+							}
+						},
+						{
+							"name": "Get Customer",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/customers/:customer_name",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "customers", ":customer_name"],
+									"variable": [
+										{
+											"key": "customer_name",
+											"value": "CUST-001"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Warehouses",
+					"item": [
+						{
+							"name": "List Warehouses",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/warehouses",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "warehouses"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Invoice",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer\": \"CUST-001\",\n    \"customer_type\": \"Direct\",\n    \"referral_code\": null,\n    \"pos_profile_id\": \"Main Store\",\n    \"items\": [\n        {\n            \"item_code\": \"ITEM-001\",\n            \"qty\": 2,\n            \"rate\": 100.00,\n            \"is_vatable\": true\n        }\n    ],\n    \"payments\": [\n        {\n            \"mode_of_payment\": \"Cash\",\n            \"amount\": 240.00\n        }\n    ],\n    \"notes\": \"Test invoice\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/invoice",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "invoice"]
+						},
+						"description": "Create a POS Sales Invoice. This endpoint:\n- Validates POS Profile\n- Calculates VAT\n- Validates stock availability\n- Creates GL entries\n- Processes payments\n- Updates inventory"
+					}
+				}
+			]
+		},
+		{
+			"name": "Quick Actions",
+			"item": [
+				{
+					"name": "Get Frequent Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/frequent-items?pos_profile_id=Main Store&limit=20",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "frequent-items"],
+							"query": [
+								{
+									"key": "pos_profile_id",
+									"value": "Main Store"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Recent Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/recent-customers?pos_profile_id=Main Store&limit=10",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "recent-customers"],
+							"query": [
+								{
+									"key": "pos_profile_id",
+									"value": "Main Store"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Barcode Lookup",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/barcode/:barcode",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "barcode", ":barcode"],
+							"variable": [
+								{
+									"key": "barcode",
+									"value": "1234567890123"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Item Search",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/search?q=paint&limit=10",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "search"],
+							"query": [
+								{
+									"key": "q",
+									"value": "paint"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Quick Sale",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pos_profile_id\": \"Main Store\",\n    \"item_code\": \"ITEM-001\",\n    \"qty\": 1,\n    \"customer\": \"CUST-001\",\n    \"payment_method\": \"Cash\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/quick-sale",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "quick-sale"]
+						}
+					}
+				},
+				{
+					"name": "Repeat Last Sale",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"pos_profile_id\": \"Main Store\",\n    \"customer\": \"CUST-001\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/repeat-last",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "repeat-last"]
+						}
+					}
+				},
+				{
+					"name": "Bulk Item Add",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"items\": [\n        {\"item_code\": \"ITEM-001\", \"qty\": 2},\n        {\"item_code\": \"ITEM-002\", \"qty\": 1}\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/quick-actions/bulk-add",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "quick-actions", "bulk-add"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "M-Pesa Payments",
+			"item": [
+				{
+					"name": "Initiate STK Push",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone_number\": \"254712345678\",\n    \"amount\": 1000.00,\n    \"account_reference\": \"INV-001\",\n    \"transaction_desc\": \"POS Payment\",\n    \"invoice_id\": \"INV-001\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/payments/mpesa/stk-push",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "payments", "mpesa", "stk-push"]
+						},
+						"description": "Initiate M-Pesa STK Push payment. Phone number must be in format: 2547XXXXXXXX"
+					}
+				},
+				{
+					"name": "Confirm Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"checkout_request_id\": \"ws_CO_12345678901234567890\",\n    \"invoice_id\": \"INV-001\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/payments/mpesa/confirm",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "payments", "mpesa", "confirm"]
+						}
+					}
+				},
+				{
+					"name": "Query Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"checkout_request_id\": \"ws_CO_12345678901234567890\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/payments/mpesa/query",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "payments", "mpesa", "query"]
+						}
+					}
+				},
+				{
+					"name": "M-Pesa Callback (Webhook)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"Body\": {\n        \"stkCallback\": {\n            \"ResultCode\": 0,\n            \"ResultDesc\": \"The service request is processed successfully.\",\n            \"MerchantRequestID\": \"12345-67890-12345\",\n            \"CheckoutRequestID\": \"ws_CO_12345678901234567890\",\n            \"CallbackMetadata\": {\n                \"Item\": [\n                    {\"Name\": \"Amount\", \"Value\": 1000.00},\n                    {\"Name\": \"MpesaReceiptNumber\", \"Value\": \"QGH1234567\"},\n                    {\"Name\": \"TransactionDate\", \"Value\": \"20240101120000\"},\n                    {\"Name\": \"PhoneNumber\", \"Value\": \"254712345678\"}\n                ]\n            }\n        }\n    }\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/payments/mpesa/callback",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "payments", "mpesa", "callback"]
+						},
+						"description": "Webhook endpoint for M-Pesa callbacks. This is called by M-Pesa, not by your application."
+					}
+				}
+			]
+		},
+		{
+			"name": "Receipts & Printing",
+			"item": [
+				{
+					"name": "Get Receipt (HTML)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/invoices/:invoice_id/receipt?format=html&language=en",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "invoices", ":invoice_id", "receipt"],
+							"query": [
+								{
+									"key": "format",
+									"value": "html"
+								},
+								{
+									"key": "language",
+									"value": "en"
+								}
+							],
+							"variable": [
+								{
+									"key": "invoice_id",
+									"value": "INV-001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Thermal Receipt",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/invoices/:invoice_id/receipt/thermal?language=en",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "invoices", ":invoice_id", "receipt", "thermal"],
+							"query": [
+								{
+									"key": "language",
+									"value": "en"
+								}
+							],
+							"variable": [
+								{
+									"key": "invoice_id",
+									"value": "INV-001"
+								}
+							]
+						},
+						"description": "Get receipt in thermal printer format. Language can be 'en' or 'sw' (Swahili)."
+					}
+				},
+				{
+					"name": "Email Receipt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"customer@example.com\",\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/invoices/:invoice_id/receipt/email",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "invoices", ":invoice_id", "receipt", "email"],
+							"variable": [
+								{
+									"key": "invoice_id",
+									"value": "INV-001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "SMS Receipt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone_number\": \"254712345678\",\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/invoices/:invoice_id/receipt/sms",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "invoices", ":invoice_id", "receipt", "sms"],
+							"variable": [
+								{
+									"key": "invoice_id",
+									"value": "INV-001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Offline Sync",
+			"item": [
+				{
+					"name": "Get Sync Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/sync/status",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "sync", "status"]
+						}
+					}
+				},
+				{
+					"name": "Get Pending Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/sync/pending",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "sync", "pending"]
+						}
+					}
+				},
+				{
+					"name": "Sync Pending",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"max_retries\": 3\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/sync/sync",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "sync", "sync"]
+						}
+					}
+				},
+				{
+					"name": "Get Transaction Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/sync/transaction/:transaction_id",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "sync", "transaction", ":transaction_id"],
+							"variable": [
+								{
+									"key": "transaction_id",
+									"value": "OFFLINE-20240101120000"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Resolve Conflict",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"transaction_id\": \"OFFLINE-20240101120000\",\n    \"resolution\": \"keep_local\",\n    \"server_data\": null\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/sync/resolve-conflict",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "sync", "resolve-conflict"]
+						},
+						"description": "Resolve sync conflict. Resolution can be: 'keep_local', 'use_server', or 'merge'"
+					}
+				}
+			]
+		},
+		{
+			"name": "Analytics",
+			"item": [
+				{
+					"name": "Daily Sales",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/analytics/daily?date=2024-01-01",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "analytics", "daily"],
+							"query": [
+								{
+									"key": "date",
+									"value": "2024-01-01",
+									"disabled": true,
+									"description": "Date in YYYY-MM-DD format (defaults to today)"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Product Performance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/analytics/products?from_date=2024-01-01&to_date=2024-01-31&limit=20",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "analytics", "products"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "to_date",
+									"value": "2024-01-31",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Payment Analysis",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/analytics/payments?from_date=2024-01-01&to_date=2024-01-31",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "analytics", "payments"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "to_date",
+									"value": "2024-01-31",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Staff Performance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/analytics/staff?from_date=2024-01-01&to_date=2024-01-31",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "analytics", "staff"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "to_date",
+									"value": "2024-01-31",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Customer Insights",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/analytics/customers?from_date=2024-01-01&to_date=2024-01-31&limit=20",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "analytics", "customers"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2024-01-01",
+									"disabled": true
+								},
+								{
+									"key": "to_date",
+									"value": "2024-01-31",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Loyalty Program",
+			"item": [
+				{
+					"name": "Get Customer Points",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/loyalty/customer/:customer/points",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "loyalty", "customer", ":customer", "points"],
+							"variable": [
+								{
+									"key": "customer",
+									"value": "CUST-001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Tier",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/loyalty/customer/:customer/tier",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "loyalty", "customer", ":customer", "tier"],
+							"variable": [
+								{
+									"key": "customer",
+									"value": "CUST-001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Calculate Points",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"purchase_amount\": 1000.00,\n    \"customer\": \"CUST-001\",\n    \"is_birthday\": false\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/loyalty/calculate-points",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "loyalty", "calculate-points"]
+						}
+					}
+				},
+				{
+					"name": "Redeem Points",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer\": \"CUST-001\",\n    \"points_to_redeem\": 100,\n    \"invoice_amount\": 1000.00\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/loyalty/redeem",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "loyalty", "redeem"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Layaway/Installments",
+			"item": [
+				{
+					"name": "Create Layaway",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer\": \"CUST-001\",\n    \"items\": [\n        {\"item_code\": \"ITEM-001\", \"qty\": 1, \"rate\": 5000.00}\n    ],\n    \"total_amount\": 5000.00,\n    \"down_payment\": 1000.00,\n    \"installment_periods\": 4,\n    \"payment_schedule\": \"monthly\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/layaway/create",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "layaway", "create"]
+						}
+					}
+				},
+				{
+					"name": "Get Layaway Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/layaway/:layaway_id",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "layaway", ":layaway_id"],
+							"variable": [
+								{
+									"key": "layaway_id",
+									"value": "LAY-001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Record Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"layaway_id\": \"LAY-001\",\n    \"amount\": 1000.00,\n    \"payment_date\": \"2024-01-15\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/layaway/payment",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "layaway", "payment"]
+						}
+					}
+				},
+				{
+					"name": "Complete Layaway",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/pos/layaway/:layaway_id/complete",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "layaway", ":layaway_id", "complete"],
+							"variable": [
+								{
+									"key": "layaway_id",
+									"value": "LAY-001"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Cancel Layaway",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"layaway_id\": \"LAY-001\",\n    \"refund_policy\": \"partial\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/layaway/:layaway_id/cancel",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "layaway", ":layaway_id", "cancel"],
+							"variable": [
+								{
+									"key": "layaway_id",
+									"value": "LAY-001"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Receipts & Printing",
+			"item": [
+				{
+					"name": "Generate Receipt",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pos/receipts/INV-2026-00001?format=thermal&language=en",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "receipts", "INV-2026-00001"],
+							"query": [
+								{
+									"key": "format",
+									"value": "thermal"
+								},
+								{
+									"key": "language",
+									"value": "en"
+								}
+							]
+						},
+						"description": "Generate receipt for an invoice (thermal, HTML, or PDF format)"
+					}
+				},
+				{
+					"name": "Email Receipt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"customer@example.com\",\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pos/receipts/INV-2026-00001/email",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "receipts", "INV-2026-00001", "email"]
+						},
+						"description": "Send receipt via email"
+					}
+				},
+				{
+					"name": "SMS Receipt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone_number\": \"+254712345678\",\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pos/receipts/INV-2026-00001/sms",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "receipts", "INV-2026-00001", "sms"]
+						},
+						"description": "Send receipt via SMS"
+					}
+				},
+				{
+					"name": "Bulk Print Receipts",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"invoice_ids\": [\"INV-2026-00001\", \"INV-2026-00002\"],\n    \"format\": \"thermal\",\n    \"width\": 80,\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/pos/receipts/bulk-print",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "receipts", "bulk-print"]
+						},
+						"description": "Print multiple receipts at once"
+					}
+				}
+			]
+		},
+		{
+			"name": "Internationalization (i18n)",
+			"item": [
+				{
+					"name": "Get Supported Languages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/i18n/languages",
+							"host": ["{{base_url}}"],
+							"path": ["api", "i18n", "languages"]
+						},
+						"description": "Get list of supported languages"
+					}
+				},
+				{
+					"name": "Get Translations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/i18n/translations/sw",
+							"host": ["{{base_url}}"],
+							"path": ["api", "i18n", "translations", "sw"]
+						},
+						"description": "Get translations for Swahili language"
+					}
+				},
+				{
+					"name": "Format Currency",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 1500.50,\n    \"currency\": \"KES\",\n    \"language\": \"sw\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/i18n/format/currency",
+							"host": ["{{base_url}}"],
+							"path": ["api", "i18n", "format", "currency"]
+						},
+						"description": "Format currency amount with locale-specific formatting"
+					}
+				},
+				{
+					"name": "Format Date",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"date_string\": \"2026-01-19\",\n    \"format\": \"long\",\n    \"language\": \"sw\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/i18n/format/date",
+							"host": ["{{base_url}}"],
+							"path": ["api", "i18n", "format", "date"]
+						},
+						"description": "Format date with locale-specific formatting"
+					}
+				},
+				{
+					"name": "Get Translated Text",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/i18n/text/receipt_total?language=sw",
+							"host": ["{{base_url}}"],
+							"path": ["api", "i18n", "text", "receipt_total"],
+							"query": [
+								{
+									"key": "language",
+									"value": "sw"
+								}
+							]
+						},
+						"description": "Get translated text for a specific key"
+					}
+				}
+			]
+		},
+		{
+			"name": "Analytics & Reporting",
+			"item": [
+				{
+					"name": "Daily Sales Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pos/analytics/daily?date=2026-01-19",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "analytics", "daily"],
+							"query": [
+								{
+									"key": "date",
+									"value": "2026-01-19"
+								}
+							]
+						},
+						"description": "Get daily sales analytics"
+					}
+				},
+				{
+					"name": "Top Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pos/analytics/products?from_date=2026-01-01&to_date=2026-01-19&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "analytics", "products"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "to_date",
+									"value": "2026-01-19"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get top performing products analytics"
+					}
+				},
+				{
+					"name": "Payment Method Analysis",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pos/analytics/payments?from_date=2026-01-01&to_date=2026-01-19",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "analytics", "payments"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "to_date",
+									"value": "2026-01-19"
+								}
+							]
+						},
+						"description": "Get payment method breakdown analytics"
+					}
+				},
+				{
+					"name": "Staff Performance",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pos/analytics/staff?from_date=2026-01-01&to_date=2026-01-19",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "analytics", "staff"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "to_date",
+									"value": "2026-01-19"
+								}
+							]
+						},
+						"description": "Get staff performance analytics"
+					}
+				},
+				{
+					"name": "Customer Insights",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/pos/analytics/customers?from_date=2026-01-01&to_date=2026-01-19&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "pos", "analytics", "customers"],
+							"query": [
+								{
+									"key": "from_date",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "to_date",
+									"value": "2026-01-19"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get customer behavior insights"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "api_base_url",
+			"value": "http://localhost:4000/api",
+			"type": "string"
+		},
+		{
+			"key": "base_url",
+			"value": "http://localhost:9000",
+			"type": "string"
+		},
+		{
+			"key": "tenant_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

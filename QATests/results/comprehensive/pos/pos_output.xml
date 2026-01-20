@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 6.1.1 (Python 3.13.5 on darwin)" generated="20260111 15:55:03.681" rpa="false" schemaversion="4">
+<suite id="s1" name="Pos" source="/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/pos">
+<suite id="s1-s1" name="Test Pos Comprehensive" source="/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/pos/test_pos_comprehensive.robot">
+<kw name="Run Keywords" library="BuiltIn" type="SETUP">
+<arg>Create Session</arg>
+<arg>api</arg>
+<arg>${BASE_URL}</arg>
+<arg>AND</arg>
+<arg>Get Auth Token For Suite</arg>
+<doc>Executes all the given keywords in a sequence.</doc>
+<kw name="Create Session" library="RequestsLibrary">
+<arg>api</arg>
+<arg>${BASE_URL}</arg>
+<doc>Create Session: create a HTTP session to a server</doc>
+<msg timestamp="20260111 15:55:03.727" level="INFO">Creating Session using : alias=api, url=http://localhost:9000, headers={},                     cookies={}, auth=None, timeout=None, proxies=None, verify=False,                     debug=0 </msg>
+<status status="PASS" starttime="20260111 15:55:03.727" endtime="20260111 15:55:03.727"/>
+</kw>
+<kw name="Get Auth Token For Suite">
+<kw name="Create Dictionary" library="BuiltIn">
+<var>${payload}</var>
+<arg>email=${TEST_EMAIL}</arg>
+<arg>password=${TEST_PASSWORD}</arg>
+<arg>tenant_id=${TEST_TENANT}</arg>
+<doc>Creates and returns a dictionary based on the given ``items``.</doc>
+<msg timestamp="20260111 15:55:03.727" level="INFO">${payload} = {'email': 'admin@moranerp.com', 'password': 'admin123', 'tenant_id': 'TEN-KE-26-Z11N5'}</msg>
+<status status="PASS" starttime="20260111 15:55:03.727" endtime="20260111 15:55:03.727"/>
+</kw>
+<kw name="POST On Session" library="RequestsLibrary">
+<var>${response}</var>
+<arg>api</arg>
+<arg>/auth/v1/login-with-tenant</arg>
+<arg>json=${payload}</arg>
+<doc>Sends a POST request on a previously created HTTP Session.</doc>
+<msg timestamp="20260111 15:55:03.734" level="INFO">POST Request : url=http://localhost:9000/auth/v1/login-with-tenant 
+ path_url=/auth/v1/login-with-tenant 
+ headers={'User-Agent': 'python-requests/2.32.3', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'Content-Length': '87', 'Content-Type': 'application/json'} 
+ body=b'{"email": "admin@moranerp.com", "password": "admin123", "tenant_id": "TEN-KE-26-Z11N5"}' 
+ </msg>
+<msg timestamp="20260111 15:55:03.734" level="INFO">POST Response : url=http://localhost:9000/auth/v1/login-with-tenant 
+ status=401, reason=Unauthorized 
+ headers={'date': 'Sun, 11 Jan 2026 12:55:03 GMT', 'server': 'uvicorn', 'content-length': '32', 'content-type': 'application/json'} 
+ body={"detail":"Invalid credentials"} 
+ </msg>
+<msg timestamp="20260111 15:55:03.734" level="FAIL">HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</msg>
+<status status="FAIL" starttime="20260111 15:55:03.727" endtime="20260111 15:55:03.735"/>
+</kw>
+<kw name="Set Suite Variable" library="BuiltIn">
+<arg>${SUITE_TOKEN}</arg>
+<arg>${response.json()['access_token']}</arg>
+<doc>Makes a variable available everywhere within the scope of the current suite.</doc>
+<status status="NOT RUN" starttime="20260111 15:55:03.735" endtime="20260111 15:55:03.735"/>
+</kw>
+<status status="FAIL" starttime="20260111 15:55:03.727" endtime="20260111 15:55:03.735"/>
+</kw>
+<status status="FAIL" starttime="20260111 15:55:03.727" endtime="20260111 15:55:03.735"/>
+</kw>
+<test id="s1-s1-t1" name="List POS Items" line="22">
+<doc>Test GET /pos/items - list items available for POS</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.735" endtime="20260111 15:55:03.735">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t2" name="List POS Profiles" line="33">
+<doc>Test GET /pos/profiles - list POS profiles</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.735" endtime="20260111 15:55:03.735">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t3" name="Search POS Items" line="45">
+<doc>Test GET /pos/quick-actions/search - search for items</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>quick-actions</tag>
+<status status="FAIL" starttime="20260111 15:55:03.735" endtime="20260111 15:55:03.735">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t4" name="Get Recent Customers" line="56">
+<doc>Test GET /pos/quick-actions/recent-customers - get recent customers</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>quick-actions</tag>
+<status status="FAIL" starttime="20260111 15:55:03.735" endtime="20260111 15:55:03.735">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t5" name="Get Customer Loyalty Points" line="68">
+<doc>Test GET /api/pos/loyalty/customer/{customer}/points - get loyalty points</doc>
+<tag>auto-generated</tag>
+<tag>loyalty</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.736">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t6" name="Calculate Loyalty Points" line="79">
+<doc>Test POST /api/pos/loyalty/calculate-points - calculate points for purchase</doc>
+<tag>auto-generated</tag>
+<tag>loyalty</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.736">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t7" name="Get Layaway Status" line="97">
+<doc>Test GET /api/pos/layaway/{id} - get layaway status</doc>
+<tag>auto-generated</tag>
+<tag>layaway</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.736">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t8" name="Get Receipt" line="109">
+<doc>Test GET /api/pos/invoices/{id}/receipt - get receipt HTML</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>receipts</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.736">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t9" name="Get Thermal Receipt" line="120">
+<doc>Test GET /api/pos/invoices/{id}/receipt/thermal - get thermal receipt</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>receipts</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.736">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t10" name="Get Sync Status" line="132">
+<doc>Test GET /api/pos/sync/status - get offline sync status</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>sync</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.736">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t11" name="Get Pending Transactions" line="143">
+<doc>Test GET /api/pos/sync/pending - get pending offline transactions</doc>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<tag>sync</tag>
+<status status="FAIL" starttime="20260111 15:55:03.736" endtime="20260111 15:55:03.737">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t12" name="Get Daily Sales Analytics" line="155">
+<doc>Test GET /api/pos/analytics/daily - get daily sales analytics</doc>
+<tag>analytics</tag>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.737" endtime="20260111 15:55:03.737">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t13" name="Get Product Performance" line="166">
+<doc>Test GET /api/pos/analytics/products - get product performance</doc>
+<tag>analytics</tag>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.737" endtime="20260111 15:55:03.737">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t14" name="Get Staff Performance" line="177">
+<doc>Test GET /api/pos/analytics/staff - get staff performance</doc>
+<tag>analytics</tag>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.737" endtime="20260111 15:55:03.737">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t15" name="Get Customer Insights" line="188">
+<doc>Test GET /api/pos/analytics/customers - get customer insights</doc>
+<tag>analytics</tag>
+<tag>auto-generated</tag>
+<tag>phase_pos</tag>
+<tag>pos</tag>
+<status status="FAIL" starttime="20260111 15:55:03.737" endtime="20260111 15:55:03.737">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<kw name="Delete All Sessions" library="RequestsLibrary" type="TEARDOWN">
+<doc>Removes all the session objects</doc>
+<msg timestamp="20260111 15:55:03.737" level="INFO">Deleting All Sessions</msg>
+<status status="PASS" starttime="20260111 15:55:03.737" endtime="20260111 15:55:03.737"/>
+</kw>
+<doc>Auto-generated tests for POS (Point of Sale) APIs</doc>
+<status status="FAIL" starttime="20260111 15:55:03.688" endtime="20260111 15:55:03.737">Suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</suite>
+<status status="FAIL" starttime="20260111 15:55:03.682" endtime="20260111 15:55:03.738"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="15" skip="0">All Tests</stat>
+</total>
+<tag>
+<stat pass="0" fail="4" skip="0">analytics</stat>
+<stat pass="0" fail="15" skip="0">auto-generated</stat>
+<stat pass="0" fail="1" skip="0">layaway</stat>
+<stat pass="0" fail="2" skip="0">loyalty</stat>
+<stat pass="0" fail="15" skip="0">phase_pos</stat>
+<stat pass="0" fail="15" skip="0">pos</stat>
+<stat pass="0" fail="2" skip="0">quick-actions</stat>
+<stat pass="0" fail="2" skip="0">receipts</stat>
+<stat pass="0" fail="2" skip="0">smoke</stat>
+<stat pass="0" fail="2" skip="0">sync</stat>
+</tag>
+<suite>
+<stat pass="0" fail="15" skip="0" id="s1" name="Pos">Pos</stat>
+<stat pass="0" fail="15" skip="0" id="s1-s1" name="Test Pos Comprehensive">Pos.Test Pos Comprehensive</stat>
+</suite>
+</statistics>
+<errors>
+<msg timestamp="20260111 15:55:03.725" level="ERROR">Error in file '/Volumes/Stuff/Start Ups/MoranERP/QATests/resources/db_verification.robot' on line 3: Importing library 'DatabaseLibrary' failed: ModuleNotFoundError: No module named 'DatabaseLibrary'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /Library/Frameworks/Python.framework/Versions/3.13/bin
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python313.zip
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/lib-dynload
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages</msg>
+</errors>
+</robot>

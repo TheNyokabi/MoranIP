@@ -1,0 +1,93 @@
+{"level":30,"time":"2026-01-09T13:40:40.856Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Listening on 127.0.0.1:63579"}
+{"level":30,"time":"2026-01-09T13:40:41.934Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method newBrowser"}
+{"level":30,"time":"2026-01-09T13:40:42.687Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Adding browser to stack: chromium, version: 143.0.7499.4"}
+{"level":30,"time":"2026-01-09T13:40:42.687Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Adding 0 contexts to browser"}
+{"level":30,"time":"2026-01-09T13:40:42.687Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method newBrowser"}
+{"level":30,"time":"2026-01-09T13:40:42.691Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method newContext"}
+{"level":30,"time":"2026-01-09T13:40:42.691Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Creating new context with options: {\"acceptDownloads\":true,\"bypassCSP\":false,\"forcedColors\":\"none\",\"ignoreHTTPSErrors\":false,\"javaScriptEnabled\":true,\"offline\":false,\"reducedMotion\":\"no-preference\",\"serviceWorkers\":\"allow\",\"viewport\":{\"width\":1920,\"height\":1080}}"}
+{"level":30,"time":"2026-01-09T13:40:42.691Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"currentBrowser: {\"name\":\"chromium\",\"browser\":{\"_type\":\"Browser\",\"_guid\":\"browser@b6bc21632939630fa170b986e744443f\"},\"headless\":false,\"_contextStack\":[],\"id\":\"browser=716e74d3-0a4e-4d80-833c-62ce765344a7\"}"}
+{"level":30,"time":"2026-01-09T13:40:42.691Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Trace file: "}
+{"level":30,"time":"2026-01-09T13:40:42.711Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Setting default timeout for context context=d7ce9973-0773-465f-b944-7cf043f335e9 to 10000"}
+{"level":30,"time":"2026-01-09T13:40:42.711Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Changed active context: context=d7ce9973-0773-465f-b944-7cf043f335e9"}
+{"level":30,"time":"2026-01-09T13:40:42.711Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method newContext"}
+{"level":30,"time":"2026-01-09T13:40:42.713Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method newPage"}
+{"level":30,"time":"2026-01-09T13:40:42.713Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"currentBrowser: {\"name\":\"chromium\",\"browser\":{\"_type\":\"Browser\",\"_guid\":\"browser@b6bc21632939630fa170b986e744443f\"},\"headless\":false,\"_contextStack\":[{\"id\":\"context=d7ce9973-0773-465f-b944-7cf043f335e9\",\"c\":{\"_type\":\"BrowserContext\",\"_guid\":\"browser-context@a49e406c7434a0841fc403b3d03cf38f\"},\"pageStack\":[],\"options\":{\"acceptDownloads\":true,\"bypassCSP\":false,\"forcedColors\":\"none\",\"ignoreHTTPSErrors\":false,\"javaScriptEnabled\":true,\"offline\":false,\"reducedMotion\":\"no-preference\",\"serviceWorkers\":\"allow\",\"viewport\":{\"width\":1920,\"height\":1080}},\"traceFile\":\"\"}],\"id\":\"browser=716e74d3-0a4e-4d80-833c-62ce765344a7\"}"}
+{"level":30,"time":"2026-01-09T13:40:43.055Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Video path: undefined"}
+{"level":30,"time":"2026-01-09T13:40:43.055Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Changed active page"}
+{"level":30,"time":"2026-01-09T13:40:43.569Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method newPage"}
+{"level":30,"time":"2026-01-09T13:40:43.570Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method fillText"}
+{"level":30,"time":"2026-01-09T13:40:43.571Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Strict mode is enabled, find Locator with input[type=\"email\"] in page."}
+{"level":30,"time":"2026-01-09T13:40:53.574Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Error of node method  fillText"}
+================= Original suppressed error =================
+locator.fill: Timeout 10000ms exceeded.
+Call log:
+  - waiting for locator('input[type="email"]')
+
+    at fillText (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/index.js:12293:17)
+    at async PlaywrightServer.fillText (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/index.js:13635:28) {
+  name: 'TimeoutError'
+}
+=============================================================
+{"level":30,"time":"2026-01-09T13:40:53.580Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method takeScreenshot"}
+{"level":30,"time":"2026-01-09T13:40:53.581Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","Take screenshot with options: ":{"path":"/Volumes/Stuff/Start Ups/MoranERP/QATests/results/ui_tests/browser/screenshot/fail-screenshot-1.png","fileType":"png","fullPage":false,"timeout":10000,"omitBackground":false}}
+{"level":30,"time":"2026-01-09T13:40:53.672Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method takeScreenshot"}
+{"level":30,"time":"2026-01-09T13:40:53.687Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.689Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.691Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.691Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.692Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.693Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.694Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.694Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.695Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.695Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.696Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.697Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.698Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.698Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.699Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.699Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.700Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.700Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.701Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.702Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.703Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.703Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.704Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.704Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.705Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.705Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.706Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.706Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.707Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.707Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.708Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.708Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.709Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.709Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.710Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.710Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.713Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.713Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.715Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.715Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.716Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method closeBrowser"}
+{"level":30,"time":"2026-01-09T13:40:53.724Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Removed page=971aaff9-0e0f-4595-afbe-5632275ac95f from context=d7ce9973-0773-465f-b944-7cf043f335e9 page stack"}
+{"level":30,"time":"2026-01-09T13:40:53.802Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method closeBrowser"}
+================= Original suppressed error =================
+Error: Browser has been closed.
+    at PlaywrightState.getActiveBrowser (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/index.js:12672:15)
+    at PlaywrightServer.getActiveBrowser (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/index.js:13622:59)
+    at PlaywrightServer.setTimeout (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/index.js:13873:57)
+    at Object.onReceiveHalfClose (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server.js:1464:25)
+    at BaseServerInterceptingCall.maybePushNextMessage (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:595:31)
+    at BaseServerInterceptingCall.handleEndEvent (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:635:14)
+    at ServerHttp2Stream.<anonymous> (/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/Browser/wrapper/node_modules/@grpc/grpc-js/build/src/server-interceptors.js:394:18)
+    at ServerHttp2Stream.emit (node:events:520:35)
+    at endReadableNT (node:internal/streams/readable:1701:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+=============================================================
+{"level":30,"time":"2026-01-09T13:40:53.804Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.804Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2026-01-09T13:40:53.819Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"Start of node method closeAllBrowsers"}
+{"level":30,"time":"2026-01-09T13:40:53.819Z","pid":73883,"hostname":"Jamess-MacBook-Pro.local","msg":"End of node method closeAllBrowsers"}

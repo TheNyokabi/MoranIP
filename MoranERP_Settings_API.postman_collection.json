@@ -1,0 +1,398 @@
+{
+	"info": {
+		"_postman_id": "moran-settings-api",
+		"name": "MoranERP Settings & Configuration API",
+		"description": "Settings and Configuration API for MoranERP.\n\nIncludes:\n- Tenant settings management\n- Module toggles\n- Provisioning operations\n- Import/Export functionality\n- System configuration\n\n**Setup Instructions:**\n1. Import this collection into Postman\n2. Use the MoranERP environment file\n3. Set authentication token and tenant_id\n4. Test configuration and provisioning operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Tenant Settings",
+			"item": [
+				{
+					"name": "Get Tenant Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/settings/tenant",
+							"host": ["{{base_url}}"],
+							"path": ["api", "settings", "tenant"]
+						},
+						"description": "Get current tenant settings and module configuration"
+					}
+				},
+				{
+					"name": "Update Module Toggles",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"enable_pos\": true,\n    \"enable_inventory\": true,\n    \"enable_hr\": false,\n    \"enable_projects\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/settings/tenant/modules",
+							"host": ["{{base_url}}"],
+							"path": ["api", "settings", "tenant", "modules"]
+						},
+						"description": "Update which modules are enabled for the tenant"
+					}
+				}
+			]
+		},
+		{
+			"name": "Provisioning",
+			"item": [
+				{
+					"name": "Start Provisioning",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"include_demo_data\": true,\n    \"pos_store_enabled\": true,\n    \"country_template\": \"KE\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/provisioning/tenants/{{tenant_id}}/start",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provisioning", "tenants", "{{tenant_id}}", "start"]
+						},
+						"description": "Start provisioning process for a tenant"
+					}
+				},
+				{
+					"name": "Get Provisioning Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/provisioning/tenants/{{tenant_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provisioning", "tenants", "{{tenant_id}}", "status"]
+						},
+						"description": "Check current provisioning status"
+					}
+				},
+				{
+					"name": "Continue Provisioning",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/provisioning/tenants/{{tenant_id}}/continue",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provisioning", "tenants", "{{tenant_id}}", "continue"]
+						},
+						"description": "Continue provisioning from the last failed step"
+					}
+				},
+				{
+					"name": "Retry Provisioning",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"step\": null\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/provisioning/tenants/{{tenant_id}}/retry",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provisioning", "tenants", "{{tenant_id}}", "retry"]
+						},
+						"description": "Retry provisioning (clears failed steps and starts over)"
+					}
+				},
+				{
+					"name": "Skip Provisioning Step",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"step\": \"step_name_here\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/provisioning/tenants/{{tenant_id}}/skip-step",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provisioning", "tenants", "{{tenant_id}}", "skip-step"]
+						},
+						"description": "Skip an optional provisioning step"
+					}
+				},
+				{
+					"name": "Get Provisioning Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/provisioning/tenants/{{tenant_id}}/logs",
+							"host": ["{{base_url}}"],
+							"path": ["api", "provisioning", "tenants", "{{tenant_id}}", "logs"]
+						},
+						"description": "Get detailed provisioning logs for debugging"
+					}
+				}
+			]
+		},
+		{
+			"name": "Import/Export",
+			"item": [
+				{
+					"name": "Get Import Template",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/imports/template/Item",
+							"host": ["{{base_url}}"],
+							"path": ["api", "imports", "template", "Item"]
+						},
+						"description": "Download import template for Items (returns CSV template)"
+					}
+				},
+				{
+					"name": "Validate Import Data",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/imports/validate/Item",
+							"host": ["{{base_url}}"],
+							"path": ["api", "imports", "validate", "Item"]
+						},
+						"description": "Validate import data before executing (upload CSV file)"
+					}
+				},
+				{
+					"name": "Execute Import",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/imports/execute/Item",
+							"host": ["{{base_url}}"],
+							"path": ["api", "imports", "execute", "Item"]
+						},
+						"description": "Execute import operation (upload and process CSV file)"
+					}
+				}
+			]
+		},
+		{
+			"name": "System Health",
+			"item": [
+				{
+					"name": "Backend Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check backend service health"
+					}
+				},
+				{
+					"name": "ERPNext Health Check",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/erpnext/health",
+							"host": ["{{base_url}}"],
+							"path": ["api", "erpnext", "health"]
+						},
+						"description": "Check ERPNext connectivity and authentication"
+					}
+				},
+				{
+					"name": "Engine Health Check",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_ids\": [\"{{tenant_id}}\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/engine-health",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "engine-health"]
+						},
+						"description": "Check health of multiple tenant engines"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set timestamp for unique test data",
+					"pm.environment.set('timestamp', new Date().getTime());"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:9000",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "tenant_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

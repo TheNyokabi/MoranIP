@@ -1,0 +1,1684 @@
+{
+	"info": {
+		"_postman_id": "moran-complete-api-collection",
+		"name": "MoranERP Complete API Collection",
+		"description": "Comprehensive Postman collection for all MoranERP API endpoints including:\n\n**Core APIs:**\n- Authentication & IAM (Identity & Access Management)\n- ERPNext Integration (Direct and Proxied)\n- Settings & Configuration\n- Provisioning & Onboarding\n- RBAC (Role-Based Access Control)\n\n**Business Module APIs:**\n- Point of Sale (POS) - Complete transaction processing\n- Inventory Management\n- Accounting & Finance\n- Customer Relationship Management (CRM)\n- Human Resources (HR)\n- Manufacturing\n- Projects\n- Sales & Support\n- Assets\n- Quality Management\n- Paint Shop Customizations\n\n**Advanced Features:**\n- Multi-tenancy support\n- M-Pesa mobile payments\n- Offline sync capabilities\n- Loyalty programs\n- Layaway/Installment payments\n- Analytics & reporting\n- Receipt generation & printing\n- Internationalization (i18n)\n- Webhook integrations\n\n**Setup Instructions:**\n1. Import this collection and the corresponding environment file\n2. Set environment variables:\n   - `base_url`: Backend API URL (http://localhost:9000)\n   - `api_base_url`: Frontend proxy URL (http://localhost:4000/api)\n   - `erpnext_url`: ERPNext instance URL (http://localhost:9010)\n   - `tenant_id`: Your tenant UUID\n   - `auth_token`: JWT token from login\n   - `user_code`: User identifier\n   - `email`: User email for login\n   - `password`: User password\n3. Start with Authentication > Login to get tokens\n4. Use tenant-scoped endpoints with proper X-Tenant-ID headers\n\n**Environment Variables Required:**\n- `base_url` - Backend FastAPI URL\n- `api_base_url` - Frontend proxy URL\n- `erpnext_url` - Direct ERPNext URL\n- `tenant_id` - Tenant UUID\n- `auth_token` - JWT access token\n- `user_code` - User code identifier\n- `email` - Login email\n- `password` - Login password\n\n**Testing Workflow:**\n1. Login → Get JWT token\n2. List Tenants → Select tenant\n3. Set tenant_id variable\n4. Test tenant-scoped endpoints\n5. Verify ERPNext connectivity\n6. Test business operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "moran-erp-team"
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication & IAM",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.access_token);",
+									"        pm.collectionVariables.set('auth_token', jsonData.access_token);",
+									"    }",
+									"    if (jsonData.user_id) {",
+									"        pm.environment.set('user_code', jsonData.user_id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/auth/login",
+							"host": ["{{api_base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login to get JWT access token. Automatically saves token to environment variables."
+					}
+				},
+				{
+					"name": "Login with Tenant Selection",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.access_token);",
+									"        pm.collectionVariables.set('auth_token', jsonData.access_token);",
+									"    }",
+									"    if (jsonData.tenant && jsonData.tenant.id) {",
+									"        pm.environment.set('tenant_id', jsonData.tenant.id);",
+									"        pm.collectionVariables.set('tenant_id', jsonData.tenant.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\",\n    \"tenant_id\": \"{{tenant_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/auth/v1/login-with-tenant",
+							"host": ["{{api_base_url}}"],
+							"path": ["auth", "v1", "login-with-tenant"]
+						},
+						"description": "Login with specific tenant selection. Useful for multi-tenant environments."
+					}
+				},
+				{
+					"name": "Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/auth/me",
+							"host": ["{{api_base_url}}"],
+							"path": ["auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "Get My Memberships",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/auth/me/memberships",
+							"host": ["{{api_base_url}}"],
+							"path": ["auth", "me", "memberships"]
+						}
+					}
+				},
+				{
+					"name": "Check Engine Health",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_ids\": [\"{{tenant_id}}\"]\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/auth/engine-health",
+							"host": ["{{api_base_url}}"],
+							"path": ["auth", "engine-health"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🏢 Tenant Management",
+			"item": [
+				{
+					"name": "List All Tenants (Super Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/iam/tenants?skip=0&limit=50",
+							"host": ["{{api_base_url}}"],
+							"path": ["iam", "tenants"],
+							"query": [
+								{
+									"key": "skip",
+									"value": "0"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Tenant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Company\",\n    \"category\": \"Retail\",\n    \"description\": \"Test tenant for API testing\",\n    \"country_code\": \"KE\",\n    \"admin_email\": \"admin@testcompany.com\",\n    \"admin_name\": \"Test Admin\",\n    \"admin_password\": \"admin123\",\n    \"engine\": \"erpnext\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/iam/tenants",
+							"host": ["{{api_base_url}}"],
+							"path": ["iam", "tenants"]
+						}
+					}
+				},
+				{
+					"name": "Invite User to Tenant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@testcompany.com\",\n    \"full_name\": \"Test User\",\n    \"role\": \"CASHIER\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/iam/tenants/{{tenant_id}}/invite",
+							"host": ["{{api_base_url}}"],
+							"path": ["iam", "tenants", "{{tenant_id}}", "invite"]
+						}
+					}
+				},
+				{
+					"name": "Get Tenant Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/iam/tenants/{{tenant_id}}/users",
+							"host": ["{{api_base_url}}"],
+							"path": ["iam", "tenants", "{{tenant_id}}", "users"]
+						}
+					}
+				},
+				{
+					"name": "Update User Role",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"role\": \"MANAGER\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/iam/tenants/{{tenant_id}}/users/{{user_code}}",
+							"host": ["{{api_base_url}}"],
+							"path": ["iam", "tenants", "{{tenant_id}}", "users", "{{user_code}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "⚙️ Settings & Configuration",
+			"item": [
+				{
+					"name": "Get Tenant Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/settings/tenant",
+							"host": ["{{api_base_url}}"],
+							"path": ["settings", "tenant"]
+						}
+					}
+				},
+				{
+					"name": "Update Module Toggles",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"enable_pos\": true,\n    \"enable_inventory\": true,\n    \"enable_accounting\": true,\n    \"enable_crm\": true\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/settings/tenant/modules",
+							"host": ["{{api_base_url}}"],
+							"path": ["settings", "tenant", "modules"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔄 Provisioning & Setup",
+			"item": [
+				{
+					"name": "Start Provisioning",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"include_demo_data\": true,\n    \"pos_store_enabled\": true,\n    \"country_template\": \"Kenya\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/provisioning/tenants/{{tenant_id}}/start",
+							"host": ["{{api_base_url}}"],
+							"path": ["provisioning", "tenants", "{{tenant_id}}", "start"]
+						}
+					}
+				},
+				{
+					"name": "Get Provisioning Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/provisioning/tenants/{{tenant_id}}/status",
+							"host": ["{{api_base_url}}"],
+							"path": ["provisioning", "tenants", "{{tenant_id}}", "status"]
+						}
+					}
+				},
+				{
+					"name": "Get Provisioning Logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/provisioning/tenants/{{tenant_id}}/logs",
+							"host": ["{{api_base_url}}"],
+							"path": ["provisioning", "tenants", "{{tenant_id}}", "logs"]
+						}
+					}
+				},
+				{
+					"name": "Retry Provisioning",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"step\": \"step_5_settings\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/provisioning/tenants/{{tenant_id}}/retry",
+							"host": ["{{api_base_url}}"],
+							"path": ["provisioning", "tenants", "{{tenant_id}}", "retry"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔗 ERPNext Direct API",
+			"item": [
+				{
+					"name": "ERPNext Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{erpnext_url}}/api/method/ping",
+							"host": ["{{erpnext_url}}"],
+							"path": ["api", "method", "ping"]
+						},
+						"description": "Basic health check for ERPNext instance"
+					}
+				},
+				{
+					"name": "ERPNext Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "usr",
+									"value": "Administrator",
+									"type": "text"
+								},
+								{
+									"key": "pwd",
+									"value": "admin",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{erpnext_url}}/api/method/login",
+							"host": ["{{erpnext_url}}"],
+							"path": ["api", "method", "login"]
+						},
+						"description": "Direct login to ERPNext. Saves cookies for authenticated requests."
+					}
+				},
+				{
+					"name": "Get ERPNext Versions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_url}}/api/method/frappe.utils.change_log.get_versions",
+							"host": ["{{erpnext_url}}"],
+							"path": ["api", "method", "frappe.utils.change_log.get_versions"]
+						},
+						"description": "Get ERPNext and Frappe framework versions"
+					}
+				},
+				{
+					"name": "List Companies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_url}}/api/resource/Company",
+							"host": ["{{erpnext_url}}"],
+							"path": ["api", "resource", "Company"]
+						},
+						"description": "List all companies in ERPNext"
+					}
+				},
+				{
+					"name": "Create Company",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"company_name\": \"API Test Company\",\n    \"abbr\": \"ATC\",\n    \"country\": \"Kenya\",\n    \"currency\": \"KES\",\n    \"default_currency\": \"KES\",\n    \"is_group\": 0\n}"
+						},
+						"url": {
+							"raw": "{{erpnext_url}}/api/resource/Company",
+							"host": ["{{erpnext_url}}"],
+							"path": ["api", "resource", "Company"]
+						},
+						"description": "Create a new company in ERPNext"
+					}
+				},
+				{
+					"name": "List Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_url}}/api/resource/Item?limit_page_length=20",
+							"host": ["{{erpnext_url}}"],
+							"path": ["api", "resource", "Item"],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "20"
+								}
+							]
+						},
+						"description": "List items in ERPNext"
+					}
+				}
+			]
+		},
+		{
+			"name": "🛒 ERPNext Proxied API",
+			"item": [
+				{
+					"name": "ERPNext Health Check",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/erpnext/health",
+							"host": ["{{api_base_url}}"],
+							"path": ["erpnext", "health"]
+						},
+						"description": "Health check for ERPNext connectivity through MoranERP backend"
+					}
+				},
+				{
+					"name": "List Companies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/erpnext/resource/Company",
+							"host": ["{{api_base_url}}"],
+							"path": ["erpnext", "resource", "Company"]
+						},
+						"description": "List companies through MoranERP backend proxy"
+					}
+				},
+				{
+					"name": "Create Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"item_code\": \"API-TEST-001\",\n    \"item_name\": \"API Test Item\",\n    \"item_group\": \"Products\",\n    \"stock_uom\": \"Nos\",\n    \"standard_rate\": 100.00,\n    \"valuation_rate\": 100.00\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/erpnext/resource/Item",
+							"host": ["{{api_base_url}}"],
+							"path": ["erpnext", "resource", "Item"]
+						},
+						"description": "Create item through MoranERP backend proxy"
+					}
+				},
+				{
+					"name": "Execute Method",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"method_name\": \"frappe.utils.change_log.get_versions\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/erpnext/method/frappe.utils.change_log.get_versions",
+							"host": ["{{api_base_url}}"],
+							"path": ["erpnext", "method", "frappe.utils.change_log.get_versions"]
+						},
+						"description": "Execute ERPNext method through MoranERP backend proxy"
+					}
+				}
+			]
+		},
+		{
+			"name": "🛍️ Point of Sale (POS)",
+			"item": [
+				{
+					"name": "Items",
+					"item": [
+						{
+							"name": "List Items",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/items",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "items"]
+								}
+							}
+						},
+						{
+							"name": "Get Item",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/items/:item_code",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "items", ":item_code"],
+									"variable": [
+										{
+											"key": "item_code",
+											"value": "ITEM-001"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Item Stock",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/items/:item_code/stock?warehouse=Main Warehouse",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "items", ":item_code", "stock"],
+									"query": [
+										{
+											"key": "warehouse",
+											"value": "Main Warehouse",
+											"disabled": true
+										}
+									],
+									"variable": [
+										{
+											"key": "item_code",
+											"value": "ITEM-001"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Customers",
+					"item": [
+						{
+							"name": "List Customers",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/customers",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "customers"]
+								}
+							}
+						},
+						{
+							"name": "Create Customer",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"customer_name\": \"John Doe\",\n    \"customer_type\": \"Individual\",\n    \"customer_group\": \"Direct\",\n    \"phone\": \"+254712345678\",\n    \"email\": \"john@example.com\"\n}"
+								},
+								"url": {
+									"raw": "{{api_base_url}}/pos/customers",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "customers"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Create Invoice",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer\": \"CUST-001\",\n    \"customer_type\": \"Direct\",\n    \"referral_code\": null,\n    \"pos_profile_id\": \"Main Store\",\n    \"items\": [\n        {\n            \"item_code\": \"ITEM-001\",\n            \"qty\": 2,\n            \"rate\": 100.00,\n            \"is_vatable\": true\n        }\n    ],\n    \"payments\": [\n        {\n            \"mode_of_payment\": \"Cash\",\n            \"amount\": 240.00\n        }\n    ],\n    \"notes\": \"Test invoice\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/pos/invoice",
+							"host": ["{{api_base_url}}"],
+							"path": ["pos", "invoice"]
+						},
+						"description": "Create a POS Sales Invoice with VAT calculation and GL entries"
+					}
+				}
+			]
+		},
+		{
+			"name": "📦 Inventory Management",
+			"item": [
+				{
+					"name": "List Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/inventory/items",
+							"host": ["{{api_base_url}}"],
+							"path": ["inventory", "items"]
+						}
+					}
+				},
+				{
+					"name": "Create Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"item_code\": \"INV-TEST-001\",\n    \"item_name\": \"Inventory Test Item\",\n    \"item_group\": \"Products\",\n    \"stock_uom\": \"Nos\",\n    \"standard_rate\": 150.00,\n    \"valuation_rate\": 140.00\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/inventory/items",
+							"host": ["{{api_base_url}}"],
+							"path": ["inventory", "items"]
+						}
+					}
+				},
+				{
+					"name": "Stock Entry",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"stock_entry_type\": \"Material Receipt\",\n    \"company\": \"Test Company\",\n    \"items\": [\n        {\n            \"item_code\": \"INV-TEST-001\",\n            \"qty\": 10,\n            \"valuation_rate\": 140.00,\n            \"warehouse\": \"Stores\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/inventory/stock-entries",
+							"host": ["{{api_base_url}}"],
+							"path": ["inventory", "stock-entries"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "💰 Accounting & Finance",
+			"item": [
+				{
+					"name": "Chart of Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/accounting/accounts",
+							"host": ["{{api_base_url}}"],
+							"path": ["accounting", "accounts"]
+						}
+					}
+				},
+				{
+					"name": "General Ledger Entries",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/accounting/gl-entries?limit=50",
+							"host": ["{{api_base_url}}"],
+							"path": ["accounting", "gl-entries"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Journal Entry",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"company\": \"Test Company\",\n    \"posting_date\": \"2024-01-15\",\n    \"voucher_type\": \"Journal Entry\",\n    \"entries\": [\n        {\n            \"account\": \"Cash - TC\",\n            \"debit\": 1000.00,\n            \"credit\": 0.00\n        },\n        {\n            \"account\": \"Sales - TC\",\n            \"debit\": 0.00,\n            \"credit\": 1000.00\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/accounting/journal-entries",
+							"host": ["{{api_base_url}}"],
+							"path": ["accounting", "journal-entries"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "👥 CRM",
+			"item": [
+				{
+					"name": "List Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/crm/customers",
+							"host": ["{{api_base_url}}"],
+							"path": ["crm", "customers"]
+						}
+					}
+				},
+				{
+					"name": "Create Lead",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"lead_name\": \"Jane Smith\",\n    \"company_name\": \"ABC Corp\",\n    \"email_id\": \"jane@abc.com\",\n    \"phone\": \"+254723456789\",\n    \"lead_owner\": \"{{user_code}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/crm/leads",
+							"host": ["{{api_base_url}}"],
+							"path": ["crm", "leads"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "👷 HR Management",
+			"item": [
+				{
+					"name": "List Employees",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/hr/employees",
+							"host": ["{{api_base_url}}"],
+							"path": ["hr", "employees"]
+						}
+					}
+				},
+				{
+					"name": "Create Employee",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"employee_name\": \"John Doe\",\n    \"company\": \"Test Company\",\n    \"department\": \"Sales\",\n    \"designation\": \"Sales Representative\",\n    \"date_of_joining\": \"2024-01-15\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/hr/employees",
+							"host": ["{{api_base_url}}"],
+							"path": ["hr", "employees"]
+						}
+					}
+				},
+				{
+					"name": "Mark Attendance",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"employee\": \"EMP-001\",\n    \"attendance_date\": \"2024-01-15\",\n    \"status\": \"Present\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/hr/attendance",
+							"host": ["{{api_base_url}}"],
+							"path": ["hr", "attendance"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🏭 Manufacturing",
+			"item": [
+				{
+					"name": "List BOMs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/manufacturing/boms",
+							"host": ["{{api_base_url}}"],
+							"path": ["manufacturing", "boms"]
+						}
+					}
+				},
+				{
+					"name": "Create Work Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"production_item\": \"ITEM-001\",\n    \"qty\": 10,\n    \"company\": \"Test Company\",\n    \"planned_start_date\": \"2024-01-20\",\n    \"bom_no\": \"BOM-001\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/manufacturing/work-orders",
+							"host": ["{{api_base_url}}"],
+							"path": ["manufacturing", "work-orders"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📋 Projects",
+			"item": [
+				{
+					"name": "List Projects",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/projects/projects",
+							"host": ["{{api_base_url}}"],
+							"path": ["projects", "projects"]
+						}
+					}
+				},
+				{
+					"name": "Create Project",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"project_name\": \"Website Redesign\",\n    \"customer\": \"CUST-001\",\n    \"company\": \"Test Company\",\n    \"expected_start_date\": \"2024-01-20\",\n    \"expected_end_date\": \"2024-02-20\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/projects/projects",
+							"host": ["{{api_base_url}}"],
+							"path": ["projects", "projects"]
+						}
+					}
+				},
+				{
+					"name": "Create Task",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"subject\": \"Design Homepage\",\n    \"project\": \"PROJ-001\",\n    \"assigned_to\": \"{{user_code}}\",\n    \"exp_start_date\": \"2024-01-20\",\n    \"exp_end_date\": \"2024-01-25\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/projects/tasks",
+							"host": ["{{api_base_url}}"],
+							"path": ["projects", "tasks"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🎨 Paint Shop Custom",
+			"item": [
+				{
+					"name": "Get Paint Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/paint/categories",
+							"host": ["{{api_base_url}}"],
+							"path": ["paint", "categories"]
+						}
+					}
+				},
+				{
+					"name": "Get Paint Colors",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/paint/colors",
+							"host": ["{{api_base_url}}"],
+							"path": ["paint", "colors"]
+						}
+					}
+				},
+				{
+					"name": "Paint Calculator",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"wall_area\": 50.0,\n    \"paint_type\": \"Emulsion\",\n    \"coats\": 2,\n    \"surface_type\": \"Plastered\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/paint/calculator",
+							"host": ["{{api_base_url}}"],
+							"path": ["paint", "calculator"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📊 Analytics & Reporting",
+			"item": [
+				{
+					"name": "POS Analytics",
+					"item": [
+						{
+							"name": "Daily Sales",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/analytics/daily?date=2024-01-01",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "analytics", "daily"],
+									"query": [
+										{
+											"key": "date",
+											"value": "2024-01-01",
+											"disabled": true,
+											"description": "Date in YYYY-MM-DD format (defaults to today)"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Product Performance",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/pos/analytics/products?from_date=2024-01-01&to_date=2024-01-31&limit=20",
+									"host": ["{{api_base_url}}"],
+									"path": ["pos", "analytics", "products"],
+									"query": [
+										{
+											"key": "from_date",
+											"value": "2024-01-01",
+											"disabled": true
+										},
+										{
+											"key": "to_date",
+											"value": "2024-01-31",
+											"disabled": true
+										},
+										{
+											"key": "limit",
+											"value": "20"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Business Intelligence",
+					"item": [
+						{
+							"name": "Sales Dashboard",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/analytics/sales-dashboard",
+									"host": ["{{api_base_url}}"],
+									"path": ["analytics", "sales-dashboard"]
+								}
+							}
+						},
+						{
+							"name": "Inventory Report",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{auth_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_base_url}}/analytics/inventory-report",
+									"host": ["{{api_base_url}}"],
+									"path": ["analytics", "inventory-report"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🌐 Internationalization",
+			"item": [
+				{
+					"name": "Get Supported Languages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/i18n/languages",
+							"host": ["{{api_base_url}}"],
+							"path": ["i18n", "languages"]
+						}
+					}
+				},
+				{
+					"name": "Get Translations",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/i18n/translations/en?section=pos",
+							"host": ["{{api_base_url}}"],
+							"path": ["i18n", "translations", "en"],
+							"query": [
+								{
+									"key": "section",
+									"value": "pos"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Format Currency",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 1234.56,\n    \"currency\": \"KES\",\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/i18n/format/currency",
+							"host": ["{{api_base_url}}"],
+							"path": ["i18n", "format", "currency"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔧 System Health",
+			"item": [
+				{
+					"name": "Backend Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check backend API health status"
+					}
+				},
+				{
+					"name": "Database Connection Test",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/system/db-test",
+							"host": ["{{api_base_url}}"],
+							"path": ["system", "db-test"]
+						},
+						"description": "Test database connectivity"
+					}
+				},
+				{
+					"name": "Redis Connection Test",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_base_url}}/system/redis-test",
+							"host": ["{{api_base_url}}"],
+							"path": ["system", "redis-test"]
+						},
+						"description": "Test Redis cache connectivity"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:9000",
+			"type": "string",
+			"description": "Backend FastAPI server URL"
+		},
+		{
+			"key": "api_base_url",
+			"value": "http://localhost:4000/api",
+			"type": "string",
+			"description": "Frontend proxy URL for API calls"
+		},
+		{
+			"key": "erpnext_url",
+			"value": "http://localhost:9010",
+			"type": "string",
+			"description": "Direct ERPNext instance URL"
+		},
+		{
+			"key": "tenant_id",
+			"value": "",
+			"type": "string",
+			"description": "Current tenant UUID"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string",
+			"description": "JWT access token from login"
+		},
+		{
+			"key": "user_code",
+			"value": "",
+			"type": "string",
+			"description": "User code/identifier"
+		},
+		{
+			"key": "email",
+			"value": "admin@moran.localhost",
+			"type": "string",
+			"description": "Login email address"
+		},
+		{
+			"key": "password",
+			"value": "admin",
+			"type": "string",
+			"description": "Login password"
+		}
+	]
+}

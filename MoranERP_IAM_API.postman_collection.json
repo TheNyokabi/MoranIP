@@ -1,0 +1,417 @@
+{
+	"info": {
+		"_postman_id": "moran-iam-api",
+		"name": "MoranERP IAM API",
+		"description": "Identity & Access Management API for MoranERP.\n\nIncludes:\n- User management\n- Tenant management\n- Role-Based Access Control (RBAC)\n- User invitations\n- Membership management\n\n**Setup Instructions:**\n1. Import this collection into Postman\n2. Use the MoranERP environment file\n3. Set authentication token (from login)\n4. Test user and tenant management operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.access_token);",
+									"        pm.collectionVariables.set('auth_token', jsonData.access_token);",
+									"        if (jsonData.tenants && jsonData.tenants.length > 0) {",
+									"            pm.environment.set('tenant_id', jsonData.tenants[0].id);",
+									"        }",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{user_email}}\",\n    \"password\": \"{{user_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Login to get JWT token and tenant information"
+					}
+				},
+				{
+					"name": "Login with Tenant Selection",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.access_token);",
+									"        pm.environment.set('tenant_id', jsonData.tenant.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{user_email}}\",\n    \"password\": \"{{user_password}}\",\n    \"tenant_id\": \"{{tenant_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/v1/login-with-tenant",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "v1", "login-with-tenant"]
+						},
+						"description": "Login with specific tenant selection"
+					}
+				},
+				{
+					"name": "Get User Memberships",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/auth/me/memberships",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "me", "memberships"]
+						},
+						"description": "Get current user's tenant memberships and roles"
+					}
+				}
+			]
+		},
+		{
+			"name": "Tenant Management",
+			"item": [
+				{
+					"name": "List All Tenants",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants?limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "List all tenants (SUPER_ADMIN only)"
+					}
+				},
+				{
+					"name": "Create Tenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('new_tenant_id', jsonData.data.id);",
+									"    pm.environment.set('new_tenant_code', jsonData.data.code);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Tenant API\",\n    \"category\": \"Retail\",\n    \"description\": \"Test tenant created via API\",\n    \"country_code\": \"KE\",\n    \"admin_email\": \"admin@testtenant.com\",\n    \"admin_name\": \"Test Admin\",\n    \"admin_password\": \"test123\",\n    \"engine\": \"erpnext\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants"]
+						},
+						"description": "Create a new tenant"
+					}
+				},
+				{
+					"name": "Get Tenant Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants/{{tenant_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants", "{{tenant_id}}"]
+						},
+						"description": "Get details of a specific tenant"
+					}
+				}
+			]
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Invite User to Tenant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"inviteduser@test.com\",\n    \"full_name\": \"Invited User\",\n    \"role\": \"CASHIER\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants/{{tenant_id}}/invite",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants", "{{tenant_id}}", "invite"]
+						},
+						"description": "Send invitation to user to join tenant"
+					}
+				},
+				{
+					"name": "Create User Directly",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"directuser@test.com\",\n    \"full_name\": \"Direct User\",\n    \"password\": \"direct123\",\n    \"role\": \"MANAGER\",\n    \"country_code\": \"KE\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants/{{tenant_id}}/users/create",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants", "{{tenant_id}}", "users", "create"]
+						},
+						"description": "Create a user directly with password (for internal staff)"
+					}
+				},
+				{
+					"name": "List Tenant Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants/{{tenant_id}}/users",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants", "{{tenant_id}}", "users"]
+						},
+						"description": "List all users in a tenant"
+					}
+				},
+				{
+					"name": "Update User Role",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"role\": \"ADMIN\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/iam/tenants/{{tenant_id}}/users/user-id-here",
+							"host": ["{{base_url}}"],
+							"path": ["api", "iam", "tenants", "{{tenant_id}}", "users", "user-id-here"]
+						},
+						"description": "Update a user's role in the tenant (replace user-id-here with actual user ID)"
+					}
+				}
+			]
+		},
+		{
+			"name": "RBAC - Roles & Permissions",
+			"item": [
+				{
+					"name": "List Available Roles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rbac/roles",
+							"host": ["{{base_url}}"],
+							"path": ["api", "rbac", "roles"]
+						},
+						"description": "List all available RBAC roles"
+					}
+				},
+				{
+					"name": "Get Role with Permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rbac/roles/CASHIER/permissions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "rbac", "roles", "CASHIER", "permissions"]
+						},
+						"description": "Get permissions for a specific role"
+					}
+				},
+				{
+					"name": "Assign Role to User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"role_code\": \"CASHIER\",\n    \"user_id\": \"user-id-here\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/rbac/tenants/{{tenant_id}}/roles",
+							"host": ["{{base_url}}"],
+							"path": ["api", "rbac", "tenants", "{{tenant_id}}", "roles"]
+						},
+						"description": "Assign a role to a user in the tenant"
+					}
+				},
+				{
+					"name": "Get User's Roles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/rbac/tenants/{{tenant_id}}/users/user-id-here/roles",
+							"host": ["{{base_url}}"],
+							"path": ["api", "rbac", "tenants", "{{tenant_id}}", "users", "user-id-here", "roles"]
+						},
+						"description": "Get all roles assigned to a user in the tenant"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set timestamp for unique test data",
+					"pm.environment.set('timestamp', new Date().getTime());"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:9000",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "tenant_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 6.1.1 (Python 3.13.5 on darwin)" generated="20260111 15:55:03.847" rpa="false" schemaversion="4">
+<suite id="s1" name="Rbac" source="/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/rbac">
+<suite id="s1-s1" name="Test Rbac Security" source="/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/rbac/test_rbac_security.robot">
+<kw name="Run Keywords" library="BuiltIn" type="SETUP">
+<arg>Create Session</arg>
+<arg>api</arg>
+<arg>${BASE_URL}</arg>
+<arg>AND</arg>
+<arg>Get Auth Token For Suite</arg>
+<doc>Executes all the given keywords in a sequence.</doc>
+<kw name="Create Session" library="RequestsLibrary">
+<arg>api</arg>
+<arg>${BASE_URL}</arg>
+<doc>Create Session: create a HTTP session to a server</doc>
+<msg timestamp="20260111 15:55:03.892" level="INFO">Creating Session using : alias=api, url=http://localhost:9000, headers={},                     cookies={}, auth=None, timeout=None, proxies=None, verify=False,                     debug=0 </msg>
+<status status="PASS" starttime="20260111 15:55:03.892" endtime="20260111 15:55:03.892"/>
+</kw>
+<kw name="Get Auth Token For Suite">
+<kw name="Create Dictionary" library="BuiltIn">
+<var>${payload}</var>
+<arg>email=${TEST_EMAIL}</arg>
+<arg>password=${TEST_PASSWORD}</arg>
+<arg>tenant_id=${TEST_TENANT}</arg>
+<doc>Creates and returns a dictionary based on the given ``items``.</doc>
+<msg timestamp="20260111 15:55:03.892" level="INFO">${payload} = {'email': 'admin@moranerp.com', 'password': 'admin123', 'tenant_id': 'TEN-KE-26-Z11N5'}</msg>
+<status status="PASS" starttime="20260111 15:55:03.892" endtime="20260111 15:55:03.892"/>
+</kw>
+<kw name="POST On Session" library="RequestsLibrary">
+<var>${response}</var>
+<arg>api</arg>
+<arg>/auth/v1/login-with-tenant</arg>
+<arg>json=${payload}</arg>
+<doc>Sends a POST request on a previously created HTTP Session.</doc>
+<msg timestamp="20260111 15:55:03.904" level="INFO">POST Request : url=http://localhost:9000/auth/v1/login-with-tenant 
+ path_url=/auth/v1/login-with-tenant 
+ headers={'User-Agent': 'python-requests/2.32.3', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'Content-Length': '87', 'Content-Type': 'application/json'} 
+ body=b'{"email": "admin@moranerp.com", "password": "admin123", "tenant_id": "TEN-KE-26-Z11N5"}' 
+ </msg>
+<msg timestamp="20260111 15:55:03.904" level="INFO">POST Response : url=http://localhost:9000/auth/v1/login-with-tenant 
+ status=401, reason=Unauthorized 
+ headers={'date': 'Sun, 11 Jan 2026 12:55:03 GMT', 'server': 'uvicorn', 'content-length': '32', 'content-type': 'application/json'} 
+ body={"detail":"Invalid credentials"} 
+ </msg>
+<msg timestamp="20260111 15:55:03.904" level="FAIL">HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</msg>
+<status status="FAIL" starttime="20260111 15:55:03.892" endtime="20260111 15:55:03.904"/>
+</kw>
+<kw name="Set Suite Variable" library="BuiltIn">
+<arg>${SUITE_TOKEN}</arg>
+<arg>${response.json()['access_token']}</arg>
+<doc>Makes a variable available everywhere within the scope of the current suite.</doc>
+<status status="NOT RUN" starttime="20260111 15:55:03.904" endtime="20260111 15:55:03.904"/>
+</kw>
+<kw name="Set Suite Variable" library="BuiltIn">
+<arg>${CREATED_ROLE_ID}</arg>
+<arg>None</arg>
+<doc>Makes a variable available everywhere within the scope of the current suite.</doc>
+<status status="NOT RUN" starttime="20260111 15:55:03.904" endtime="20260111 15:55:03.904"/>
+</kw>
+<status status="FAIL" starttime="20260111 15:55:03.892" endtime="20260111 15:55:03.904"/>
+</kw>
+<status status="FAIL" starttime="20260111 15:55:03.892" endtime="20260111 15:55:03.904"/>
+</kw>
+<test id="s1-s1-t1" name="List All Roles" line="21">
+<doc>Test GET /rbac/roles - list all available roles</doc>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<tag>rbac</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t2" name="Get Role Permissions" line="34">
+<doc>Test GET /rbac/roles/{id}/permissions - get role permissions</doc>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<tag>rbac</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t3" name="List Roles API v1" line="46">
+<doc>Test GET /api/v1/roles - list roles via v1 API</doc>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<tag>roles</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t4" name="Create Custom Role" line="59">
+<doc>Test POST /api/v1/roles - create custom role</doc>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<tag>roles</tag>
+<tag>write-operation</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t5" name="Get Role Details" line="82">
+<doc>Test GET /api/v1/roles/{id} - get role details</doc>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<tag>roles</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t6" name="List All Permissions" line="95">
+<doc>Test GET /api/v1/permissions - list all system permissions</doc>
+<tag>auto-generated</tag>
+<tag>permissions</tag>
+<tag>phase_rbac</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t7" name="Get My Permissions" line="108">
+<doc>Test GET /api/v1/permissions/me - get current user permissions</doc>
+<tag>auto-generated</tag>
+<tag>permissions</tag>
+<tag>phase_rbac</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.905" endtime="20260111 15:55:03.905">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t8" name="Check Permission" line="121">
+<doc>Test POST /api/v1/permissions/check - check if user has permission</doc>
+<tag>auto-generated</tag>
+<tag>permissions</tag>
+<tag>phase_rbac</tag>
+<status status="FAIL" starttime="20260111 15:55:03.906" endtime="20260111 15:55:03.906">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t9" name="Get User Roles" line="137">
+<doc>Test GET /api/v1/users/{id}/roles - get user's assigned roles</doc>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<tag>user-roles</tag>
+<status status="FAIL" starttime="20260111 15:55:03.906" endtime="20260111 15:55:03.906">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t10" name="Get Role Change Audit Logs" line="154">
+<doc>Test GET /api/v1/audit/roles - get role change audit logs</doc>
+<tag>audit</tag>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<status status="FAIL" starttime="20260111 15:55:03.906" endtime="20260111 15:55:03.906">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<test id="s1-s1-t11" name="Get Audit Statistics" line="165">
+<doc>Test GET /api/v1/audit/stats - get audit statistics</doc>
+<tag>audit</tag>
+<tag>auto-generated</tag>
+<tag>phase_rbac</tag>
+<status status="FAIL" starttime="20260111 15:55:03.906" endtime="20260111 15:55:03.906">Parent suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</test>
+<kw name="Delete All Sessions" library="RequestsLibrary" type="TEARDOWN">
+<doc>Removes all the session objects</doc>
+<msg timestamp="20260111 15:55:03.906" level="INFO">Deleting All Sessions</msg>
+<status status="PASS" starttime="20260111 15:55:03.906" endtime="20260111 15:55:03.906"/>
+</kw>
+<doc>Auto-generated tests for RBAC and Security APIs</doc>
+<status status="FAIL" starttime="20260111 15:55:03.854" endtime="20260111 15:55:03.906">Suite setup failed:
+HTTPError: 401 Client Error: Unauthorized for url: http://localhost:9000/auth/v1/login-with-tenant</status>
+</suite>
+<status status="FAIL" starttime="20260111 15:55:03.847" endtime="20260111 15:55:03.906"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="11" skip="0">All Tests</stat>
+</total>
+<tag>
+<stat pass="0" fail="2" skip="0">audit</stat>
+<stat pass="0" fail="11" skip="0">auto-generated</stat>
+<stat pass="0" fail="3" skip="0">permissions</stat>
+<stat pass="0" fail="11" skip="0">phase_rbac</stat>
+<stat pass="0" fail="2" skip="0">rbac</stat>
+<stat pass="0" fail="3" skip="0">roles</stat>
+<stat pass="0" fail="4" skip="0">smoke</stat>
+<stat pass="0" fail="1" skip="0">user-roles</stat>
+<stat pass="0" fail="1" skip="0">write-operation</stat>
+</tag>
+<suite>
+<stat pass="0" fail="11" skip="0" id="s1" name="Rbac">Rbac</stat>
+<stat pass="0" fail="11" skip="0" id="s1-s1" name="Test Rbac Security">Rbac.Test Rbac Security</stat>
+</suite>
+</statistics>
+<errors>
+<msg timestamp="20260111 15:55:03.890" level="ERROR">Error in file '/Volumes/Stuff/Start Ups/MoranERP/QATests/resources/db_verification.robot' on line 3: Importing library 'DatabaseLibrary' failed: ModuleNotFoundError: No module named 'DatabaseLibrary'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /Library/Frameworks/Python.framework/Versions/3.13/bin
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python313.zip
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/lib-dynload
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages</msg>
+</errors>
+</robot>

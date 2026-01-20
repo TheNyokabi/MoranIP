@@ -1,0 +1,834 @@
+{
+    "info": {
+        "name": "MoranERP - Inventory & Purchase Management",
+        "description": "Complete API collection for Inventory and Purchase Management endpoints",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "version": "1.0.0"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:9000",
+            "type": "string"
+        },
+        {
+            "key": "access_token",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Inventory Management",
+            "item": [
+                {
+                    "name": "Items",
+                    "item": [
+                        {
+                            "name": "List Items",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/items?limit=50&offset=0",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "items"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        },
+                                        {
+                                            "key": "offset",
+                                            "value": "0"
+                                        },
+                                        {
+                                            "key": "item_group",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Item",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/items/:item_code",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "items",
+                                        ":item_code"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "item_code",
+                                            "value": "ITEM-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Item",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_code\": \"ITEM-001\",\n  \"item_name\": \"Sample Item\",\n  \"item_group\": \"Products\",\n  \"stock_uom\": \"Nos\",\n  \"standard_rate\": 100.00,\n  \"description\": \"Sample item description\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/items",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "items"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Item",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_name\": \"Updated Item Name\",\n  \"standard_rate\": 150.00\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/items/:item_code",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "items",
+                                        ":item_code"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "item_code",
+                                            "value": "ITEM-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Item",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/items/:item_code",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "items",
+                                        ":item_code"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "item_code",
+                                            "value": "ITEM-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Warehouses",
+                    "item": [
+                        {
+                            "name": "List Warehouses",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/warehouses?limit=50",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "warehouses"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        },
+                                        {
+                                            "key": "company",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Warehouse",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/warehouses/:warehouse_name",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "warehouses",
+                                        ":warehouse_name"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "warehouse_name",
+                                            "value": "Main Warehouse"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Warehouse",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"warehouse_name\": \"Main Warehouse\",\n  \"company\": \"My Company\",\n  \"warehouse_type\": \"Transit\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/warehouses",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "warehouses"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Warehouse",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"warehouse_type\": \"Finished Goods\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/warehouses/:warehouse_name",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "warehouses",
+                                        ":warehouse_name"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "warehouse_name",
+                                            "value": "Main Warehouse"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Stock Operations",
+                    "item": [
+                        {
+                            "name": "Create Stock Entry",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"stock_entry_type\": \"Material Receipt\",\n  \"to_warehouse\": \"Main Warehouse\",\n  \"items\": [\n    {\n      \"item_code\": \"ITEM-001\",\n      \"qty\": 100,\n      \"t_warehouse\": \"Main Warehouse\"\n    }\n  ]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/stock-entries",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "stock-entries"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "List Stock Entries",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/stock-entries?limit=50",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "stock-entries"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        },
+                                        {
+                                            "key": "stock_entry_type",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Stock Reconciliation",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"posting_date\": \"2026-01-08\",\n  \"items\": [\n    {\n      \"item_code\": \"ITEM-001\",\n      \"warehouse\": \"Main Warehouse\",\n      \"qty\": 100,\n      \"valuation_rate\": 50.00\n    }\n  ]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/stock-reconciliations",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "stock-reconciliations"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Stock Balance",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/inventory/stock-balance?item_code=ITEM-001",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "inventory",
+                                        "stock-balance"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "item_code",
+                                            "value": "ITEM-001"
+                                        },
+                                        {
+                                            "key": "warehouse",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Purchase Management",
+            "item": [
+                {
+                    "name": "Suppliers",
+                    "item": [
+                        {
+                            "name": "List Suppliers",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/suppliers?limit=50",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "suppliers"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Supplier",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/suppliers/:supplier_id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "suppliers",
+                                        ":supplier_id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "supplier_id",
+                                            "value": "SUP-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Supplier",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"ABC Suppliers\",\n  \"supplier_group\": \"Raw Material\",\n  \"country\": \"Kenya\",\n  \"currency\": \"KES\",\n  \"tax_id\": \"P051234567X\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/suppliers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "suppliers"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Supplier",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"country\": \"Uganda\",\n  \"currency\": \"UGX\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/suppliers/:supplier_id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "suppliers",
+                                        ":supplier_id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "supplier_id",
+                                            "value": "SUP-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Supplier",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/suppliers/:supplier_id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "suppliers",
+                                        ":supplier_id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "supplier_id",
+                                            "value": "SUP-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Purchase Orders",
+                    "item": [
+                        {
+                            "name": "List Purchase Orders",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/orders?limit=50",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "orders"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Purchase Order",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/orders/:order_id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "orders",
+                                        ":order_id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "order_id",
+                                            "value": "PO-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Purchase Order",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"supplier_id\": \"SUP-001\",\n  \"order_date\": \"2026-01-08\",\n  \"currency\": \"KES\",\n  \"items\": [\n    {\n      \"item_code\": \"ITEM-001\",\n      \"qty\": 50,\n      \"rate\": 100.00,\n      \"uom\": \"Nos\"\n    }\n  ]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "orders"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Purchase Order",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"items\": [\n    {\n      \"item_code\": \"ITEM-001\",\n      \"qty\": 75,\n      \"rate\": 95.00,\n      \"uom\": \"Nos\"\n    }\n  ]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/orders/:order_id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "orders",
+                                        ":order_id"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "order_id",
+                                            "value": "PO-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Submit Purchase Order",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/orders/:order_id/submit",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "orders",
+                                        ":order_id",
+                                        "submit"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "order_id",
+                                            "value": "PO-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Cancel Purchase Order",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/orders/:order_id/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "orders",
+                                        ":order_id",
+                                        "cancel"
+                                    ],
+                                    "variable": [
+                                        {
+                                            "key": "order_id",
+                                            "value": "PO-001"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Purchase Receipts",
+                    "item": [
+                        {
+                            "name": "List Purchase Receipts",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/receipts?limit=50",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "receipts"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Purchase Receipt",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"supplier_id\": \"SUP-001\",\n  \"purchase_order_id\": \"PO-001\",\n  \"items\": [\n    {\n      \"item_code\": \"ITEM-001\",\n      \"qty\": 50,\n      \"warehouse\": \"Main Warehouse\",\n      \"rate\": 100.00\n    }\n  ]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/receipts",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "receipts"
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Purchase Invoices",
+                    "item": [
+                        {
+                            "name": "List Purchase Invoices",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/invoices?limit=50",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "invoices"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "limit",
+                                            "value": "50"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Purchase Invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"supplier_id\": \"SUP-001\",\n  \"bill_no\": \"INV-2026-001\",\n  \"bill_date\": \"2026-01-08\",\n  \"items\": [\n    {\n      \"item_code\": \"ITEM-001\",\n      \"qty\": 50,\n      \"rate\": 100.00\n    }\n  ]\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/purchases/invoices",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchases",
+                                        "invoices"
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

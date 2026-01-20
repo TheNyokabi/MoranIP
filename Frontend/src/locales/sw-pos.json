@@ -1,0 +1,151 @@
+{
+  "pos": {
+    "title": "Sehemu ya Mauzo",
+    "search_placeholder": "Tafuta bidhaa...",
+    "customer": "Mteja",
+    "total": "Jumla",
+    "subtotal": "Jumla Ndogo",
+    "tax": "Kodi",
+    "discount": "Punguzo",
+    "payment": "Malipo",
+    "change": "Mabadiliko",
+    "checkout": "Lipa",
+    "cancel": "Ghairi",
+    "save": "Hifadhi",
+    "print": "Chapisha",
+    "email": "Barua pepe",
+    "sms": "SMS",
+    "receipt": "Risiti",
+    "invoice": "Ankara"
+  },
+  "quick_actions": {
+    "title": "Vitendo vya Haraka",
+    "frequent_items": "Bidhaa za Mara kwa Mara",
+    "recent_customers": "Wateja wa Hivi Karibuni",
+    "search": "Tafuta",
+    "repeat_last": "Rudia ya Mwisho",
+    "quick_sale": "Uuzaji wa Haraka"
+  },
+  "item": {
+    "code": "Nambari ya Bidhaa",
+    "name": "Jina la Bidhaa",
+    "price": "Bei",
+    "quantity": "Idadi",
+    "total": "Jumla",
+    "add_to_cart": "Ongeza kwenye Rukwama",
+    "remove": "Ondoa",
+    "stock": "Hekalu",
+    "available": "Inapatikana"
+  },
+  "customer": {
+    "name": "Jina la Mteja",
+    "phone": "Simu",
+    "email": "Barua pepe",
+    "walk_in": "Mteja wa Nje",
+    "add_new": "Ongeza Mteja Mpya",
+    "search": "Tafuta Mteja"
+  },
+  "payment": {
+    "cash": "Fedha Taslimu",
+    "mpesa": "M-Pesa",
+    "card": "Kadi",
+    "bank": "Benki",
+    "amount": "Kiasi",
+    "tendered": "Iliyotolewa",
+    "change": "Mabadiliko",
+    "method": "Njia ya Malipo",
+    "confirm": "Thibitisha Malipo"
+  },
+  "receipt": {
+    "title": "Risiti",
+    "invoice": "Ankara",
+    "date": "Tarehe",
+    "time": "Muda",
+    "customer": "Mteja",
+    "items": "Bidhaa",
+    "total": "Jumla",
+    "thank_you": "Asante kwa kununua!",
+    "visit_again": "Karibu tena hivi karibuni!",
+    "mpesa_code": "Nambari ya M-Pesa",
+    "transaction_id": "Kitambulisho cha Muamala"
+  },
+  "error": {
+    "item_not_found": "Bidhaa haijapatikana",
+    "customer_not_found": "Mteja hajapatikana",
+    "payment_failed": "Malipo yameshindikana",
+    "insufficient_stock": "Hakuna bidhaa za kutosha",
+    "invalid_amount": "Kiasi si sahihi",
+    "network_error": "Tatizo la mtandao",
+    "server_error": "Tatizo la seva",
+    "validation_error": "Tatizo la uthibitisho"
+  },
+  "accessibility": {
+    "screen_reader": "Hali ya Kisoma Screen",
+    "high_contrast": "Tofauti ya Juu",
+    "large_text": "Nakala Kubwa",
+    "keyboard_nav": "Urambazaji wa Kibodi",
+    "voice_commands": "Amri za Sauti",
+    "zoom": "Kuza",
+    "reduce_motion": "Punguza Mwendo",
+    "color_blind": "Upofu wa Rangi"
+  },
+  "common": {
+    "yes": "Ndio",
+    "no": "Hapana",
+    "ok": "Sawa",
+    "back": "Rudi",
+    "next": "Ifuatayo",
+    "previous": "Iliyopita",
+    "close": "Funga",
+    "open": "Fungua",
+    "loading": "Inapakia...",
+    "saving": "Inahifadhi...",
+    "processing": "Inachakata...",
+    "success": "Mafanikio",
+    "error": "Tatizo",
+    "warning": "Onyo",
+    "info": "Taarifa"
+  },
+  "validation": {
+    "required": "Sharti",
+    "invalid_email": "Barua pepe si sahihi",
+    "invalid_phone": "Nambari ya simu si sahihi",
+    "min_length": "Lazima iwe angalau vibambo {count}",
+    "max_length": "Haipaswi kuzidi vibambo {count}",
+    "min_value": "Lazima iwe angalau {value}",
+    "max_value": "Haipaswi kuzidi {value}",
+    "numeric_only": "Nambari tu",
+    "positive_number": "Nambari chanya tu"
+  },
+  "currency": {
+    "kes": "KES",
+    "usd": "USD",
+    "eur": "EUR",
+    "gbp": "GBP"
+  },
+  "date": {
+    "today": "Leo",
+    "yesterday": "Jana",
+    "tomorrow": "Kesho",
+    "this_week": "Wiki hii",
+    "this_month": "Mwezi huu",
+    "this_year": "Mwaka huu"
+  },
+  "mpesa": {
+    "stk_push": "M-Pesa STK Push",
+    "till_number": "Nambari ya Till",
+    "paybill": "Paybill",
+    "enter_phone": "Weka nambari ya simu",
+    "confirm_payment": "Thibitisha malipo",
+    "payment_pending": "Malipo yanangoja uthibitisho",
+    "payment_successful": "Malipo yamefanikiwa",
+    "payment_failed": "Malipo yameshindikana"
+  },
+  "thermal": {
+    "printer_32mm": "Kichapishi cha 32mm",
+    "printer_48mm": "Kichapishi cha 48mm",
+    "printer_80mm": "Kichapishi cha 80mm",
+    "test_print": "Chapisha Jaribio",
+    "paper_size": "Ukubwa wa Karatasi"
+  }
+}

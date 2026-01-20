@@ -1,0 +1,481 @@
+{
+	"info": {
+		"_postman_id": "moran-erpnext-direct-api",
+		"name": "MoranERP ERPNext Direct API",
+		"description": "Direct ERPNext API endpoints for testing ERPNext connectivity and operations.\n\nThis collection tests ERPNext directly without going through the MoranERP backend proxy.\n\n**Setup Instructions:**\n1. Import this collection into Postman\n2. Use the MoranERP environment file\n3. Set `erpnext_base_url`: http://localhost:9010\n4. Start with Authentication > Login to get session cookies\n\n**Important:** This bypasses MoranERP backend and tests ERPNext directly.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Health Check - Ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/method/ping",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "method", "ping"]
+						},
+						"description": "Basic health check for ERPNext API"
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Login successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.eql(\"Logged In\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "usr",
+									"value": "Administrator",
+									"type": "text"
+								},
+								{
+									"key": "pwd",
+									"value": "admin",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/method/login",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "method", "login"]
+						},
+						"description": "Login to ERPNext directly (sets session cookies)"
+					}
+				},
+				{
+					"name": "Get Logged User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/method/frappe.auth.get_logged_user",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "method", "frappe.auth.get_logged_user"]
+						},
+						"description": "Get currently logged in user (requires session cookie)"
+					}
+				}
+			]
+		},
+		{
+			"name": "System Info",
+			"item": [
+				{
+					"name": "Get System Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/method/frappe.utils.change_log.get_versions",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "method", "frappe.utils.change_log.get_versions"]
+						},
+						"description": "Get ERPNext and Frappe version information"
+					}
+				}
+			]
+		},
+		{
+			"name": "Companies",
+			"item": [
+				{
+					"name": "List Companies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Company",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Company"]
+						},
+						"description": "List all companies in ERPNext"
+					}
+				},
+				{
+					"name": "Create Company",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('test_company_name', jsonData.data.name);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"company_name\": \"Test Company Direct API\",\n    \"abbr\": \"TCDA\",\n    \"country\": \"Kenya\",\n    \"currency\": \"KES\",\n    \"default_currency\": \"KES\",\n    \"is_group\": 0\n}"
+						},
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Company",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Company"]
+						},
+						"description": "Create a new company directly in ERPNext"
+					}
+				},
+				{
+					"name": "Get Company Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Company/{{test_company_name}}",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Company", "{{test_company_name}}"]
+						},
+						"description": "Get details of a specific company"
+					}
+				}
+			]
+		},
+		{
+			"name": "Warehouses",
+			"item": [
+				{
+					"name": "List Warehouses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Warehouse",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Warehouse"]
+						},
+						"description": "List all warehouses in ERPNext"
+					}
+				},
+				{
+					"name": "Create Warehouse",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('test_warehouse_name', jsonData.data.name);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"warehouse_name\": \"Test Warehouse Direct API\",\n    \"company\": \"Test Company Direct API\"\n}"
+						},
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Warehouse",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Warehouse"]
+						},
+						"description": "Create a new warehouse directly in ERPNext"
+					}
+				}
+			]
+		},
+		{
+			"name": "Items",
+			"item": [
+				{
+					"name": "List Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Item?limit_page_length=10",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Item"],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "10"
+								}
+							]
+						},
+						"description": "List items in ERPNext (limited to 10)"
+					}
+				},
+				{
+					"name": "Create Item",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('test_item_name', jsonData.data.name);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"item_code\": \"TEST-ITEM-DIRECT-{{timestamp}}\",\n    \"item_name\": \"Test Item Direct API\",\n    \"item_group\": \"Products\",\n    \"stock_uom\": \"Nos\",\n    \"standard_rate\": 150.0,\n    \"valuation_rate\": 150.0\n}"
+						},
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Item",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Item"]
+						},
+						"description": "Create a new item directly in ERPNext"
+					}
+				},
+				{
+					"name": "Get Item Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Item/{{test_item_name}}",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Item", "{{test_item_name}}"]
+						},
+						"description": "Get details of a specific item"
+					}
+				}
+			]
+		},
+		{
+			"name": "Customers",
+			"item": [
+				{
+					"name": "List Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Customer?limit_page_length=10",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Customer"],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "10"
+								}
+							]
+						},
+						"description": "List customers in ERPNext"
+					}
+				},
+				{
+					"name": "Create Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"Test Customer Direct API\",\n    \"customer_type\": \"Individual\",\n    \"customer_group\": \"Direct\"\n}"
+						},
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Customer",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Customer"]
+						},
+						"description": "Create a new customer directly in ERPNext"
+					}
+				}
+			]
+		},
+		{
+			"name": "Sales Invoices",
+			"item": [
+				{
+					"name": "List Sales Invoices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Sales Invoice?limit_page_length=10",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Sales Invoice"],
+							"query": [
+								{
+									"key": "limit_page_length",
+									"value": "10"
+								}
+							]
+						},
+						"description": "List sales invoices in ERPNext"
+					}
+				},
+				{
+					"name": "Create Sales Invoice",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Frappe-Site-Name",
+								"value": "moran.localhost"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer\": \"Test Customer Direct API\",\n    \"company\": \"Test Company Direct API\",\n    \"items\": [\n        {\n            \"item_code\": \"TEST-ITEM-DIRECT-{{timestamp}}\",\n            \"qty\": 1,\n            \"rate\": 150.0,\n            \"warehouse\": \"Test Warehouse Direct API\"\n        }\n    ],\n    \"payments\": [\n        {\n            \"mode_of_payment\": \"Cash\",\n            \"amount\": 150.0\n        }\n    ],\n    \"is_pos\": 1\n}"
+						},
+						"url": {
+							"raw": "{{erpnext_base_url}}/api/resource/Sales Invoice",
+							"host": ["{{erpnext_base_url}}"],
+							"path": ["api", "resource", "Sales Invoice"]
+						},
+						"description": "Create a sales invoice directly in ERPNext"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set timestamp for unique test data",
+					"pm.environment.set('timestamp', new Date().getTime());"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "erpnext_base_url",
+			"value": "http://localhost:9010",
+			"type": "string"
+		}
+	]
+}

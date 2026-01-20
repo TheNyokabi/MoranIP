@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 6.1.1 (Python 3.13.5 on darwin)" generated="20260111 15:55:03.326" rpa="false" schemaversion="4">
+<suite id="s1" name="Erpnext" source="/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/erpnext">
+<suite id="s1-s1" name="Test Resource Api" source="/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/erpnext/test_resource_api.robot">
+<kw name="Run Keywords" library="BuiltIn" type="SETUP">
+<arg>Create Session</arg>
+<arg>api</arg>
+<arg>${BASE_URL}</arg>
+<arg>AND</arg>
+<arg>Get Auth Token For Suite</arg>
+<doc>Executes all the given keywords in a sequence.</doc>
+<kw name="Create Session" library="RequestsLibrary">
+<arg>api</arg>
+<arg>${BASE_URL}</arg>
+<doc>Create Session: create a HTTP session to a server</doc>
+<msg timestamp="20260111 15:55:03.379" level="INFO">Creating Session using : alias=api, url=http://localhost:9000, headers={},                     cookies={}, auth=None, timeout=None, proxies=None, verify=False,                     debug=0 </msg>
+<status status="PASS" starttime="20260111 15:55:03.379" endtime="20260111 15:55:03.379"/>
+</kw>
+<kw name="Get Auth Token For Suite">
+<kw name="Create Dictionary" library="BuiltIn">
+<var>${payload}</var>
+<arg>email=${TEST_EMAIL}</arg>
+<arg>password=${TEST_PASSWORD}</arg>
+<arg>tenant_id=${TEST_TENANT}</arg>
+<doc>Creates and returns a dictionary based on the given ``items``.</doc>
+<msg timestamp="20260111 15:55:03.379" level="FAIL">Variable '${TEST_PASSWORD}' not found.</msg>
+<status status="FAIL" starttime="20260111 15:55:03.379" endtime="20260111 15:55:03.380"/>
+</kw>
+<kw name="POST On Session" library="RequestsLibrary">
+<var>${response}</var>
+<arg>api</arg>
+<arg>/auth/v1/login-with-tenant</arg>
+<arg>json=${payload}</arg>
+<doc>Sends a POST request on a previously created HTTP Session.</doc>
+<status status="NOT RUN" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380"/>
+</kw>
+<kw name="Set Suite Variable" library="BuiltIn">
+<arg>${SUITE_TOKEN}</arg>
+<arg>${response.json()['access_token']}</arg>
+<doc>Makes a variable available everywhere within the scope of the current suite.</doc>
+<status status="NOT RUN" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380"/>
+</kw>
+<status status="FAIL" starttime="20260111 15:55:03.379" endtime="20260111 15:55:03.380"/>
+</kw>
+<status status="FAIL" starttime="20260111 15:55:03.379" endtime="20260111 15:55:03.380"/>
+</kw>
+<test id="s1-s1-t1" name="List ERPNext Items" line="21">
+<doc>Test GET /erpnext/resource/Item - list items from ERPNext</doc>
+<tag>auto-generated</tag>
+<tag>erpnext</tag>
+<tag>phase_erp</tag>
+<tag>smoke</tag>
+<status status="FAIL" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380">Parent suite setup failed:
+Variable '${TEST_PASSWORD}' not found.</status>
+</test>
+<test id="s1-s1-t2" name="Create ERPNext Item" line="45">
+<doc>Test POST /erpnext/resource/Item - create new item in ERPNext</doc>
+<tag>auto-generated</tag>
+<tag>erpnext</tag>
+<tag>phase_erp</tag>
+<tag>write-operation</tag>
+<status status="FAIL" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380">Parent suite setup failed:
+Variable '${TEST_PASSWORD}' not found.</status>
+</test>
+<test id="s1-s1-t3" name="Get ERPNext Item" line="76">
+<doc>Test GET /erpnext/resource/Item/{name} - get specific item</doc>
+<tag>auto-generated</tag>
+<tag>erpnext</tag>
+<tag>phase_erp</tag>
+<status status="FAIL" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380">Parent suite setup failed:
+Variable '${TEST_PASSWORD}' not found.</status>
+</test>
+<test id="s1-s1-t4" name="Update ERPNext Item" line="93">
+<doc>Test PUT /erpnext/resource/Item/{name} - update item</doc>
+<tag>auto-generated</tag>
+<tag>erpnext</tag>
+<tag>phase_erp</tag>
+<tag>write-operation</tag>
+<status status="FAIL" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380">Parent suite setup failed:
+Variable '${TEST_PASSWORD}' not found.</status>
+</test>
+<test id="s1-s1-t5" name="Delete ERPNext Item" line="118">
+<doc>Test DELETE /erpnext/resource/Item/{name} - delete item</doc>
+<tag>auto-generated</tag>
+<tag>cleanup</tag>
+<tag>erpnext</tag>
+<tag>phase_erp</tag>
+<tag>write-operation</tag>
+<status status="FAIL" starttime="20260111 15:55:03.380" endtime="20260111 15:55:03.380">Parent suite setup failed:
+Variable '${TEST_PASSWORD}' not found.</status>
+</test>
+<kw name="Delete All Sessions" library="RequestsLibrary" type="TEARDOWN">
+<doc>Removes all the session objects</doc>
+<msg timestamp="20260111 15:55:03.381" level="INFO">Deleting All Sessions</msg>
+<status status="PASS" starttime="20260111 15:55:03.381" endtime="20260111 15:55:03.381"/>
+</kw>
+<doc>Auto-generated tests for ERPNext Resource API</doc>
+<status status="FAIL" starttime="20260111 15:55:03.334" endtime="20260111 15:55:03.381">Suite setup failed:
+Variable '${TEST_PASSWORD}' not found.</status>
+</suite>
+<status status="FAIL" starttime="20260111 15:55:03.326" endtime="20260111 15:55:03.381"/>
+</suite>
+<statistics>
+<total>
+<stat pass="0" fail="5" skip="0">All Tests</stat>
+</total>
+<tag>
+<stat pass="0" fail="5" skip="0">auto-generated</stat>
+<stat pass="0" fail="1" skip="0">cleanup</stat>
+<stat pass="0" fail="5" skip="0">erpnext</stat>
+<stat pass="0" fail="5" skip="0">phase_erp</stat>
+<stat pass="0" fail="1" skip="0">smoke</stat>
+<stat pass="0" fail="3" skip="0">write-operation</stat>
+</tag>
+<suite>
+<stat pass="0" fail="5" skip="0" id="s1" name="Erpnext">Erpnext</stat>
+<stat pass="0" fail="5" skip="0" id="s1-s1" name="Test Resource Api">Erpnext.Test Resource Api</stat>
+</suite>
+</statistics>
+<errors>
+<msg timestamp="20260111 15:55:03.376" level="ERROR">Error in file '/Volumes/Stuff/Start Ups/MoranERP/QATests/resources/db_verification.robot' on line 3: Importing library 'DatabaseLibrary' failed: ModuleNotFoundError: No module named 'DatabaseLibrary'
+Traceback (most recent call last):
+  None
+PYTHONPATH:
+  /Library/Frameworks/Python.framework/Versions/3.13/bin
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python313.zip
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/lib-dynload
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages</msg>
+<msg timestamp="20260111 15:55:03.378" level="ERROR">Error in file '/Volumes/Stuff/Start Ups/MoranERP/QATests/auto_generated/erpnext/test_resource_api.robot' on line 17: Setting variable '${TEST_PASSWORD}' failed: Variable '${TEST_TENANT}' not found.</msg>
+</errors>
+</robot>
