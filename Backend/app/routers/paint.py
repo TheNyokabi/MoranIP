@@ -4,6 +4,7 @@ Handles custom paint sales with color codes and tint formulas
 """
 from fastapi import APIRouter, Depends, HTTPException, Body, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -72,11 +73,10 @@ async def create_color_code(
     db: Session = Depends(get_db)
 ):
     """Create a new color code."""
-    # Check if color code already exists
-    existing = db.query(ColorCode).filter(
-        ColorCode.id == data.id,
-        ColorCode.tenant_id == tenant_id
-    ).first()
+    # NOTE: ColorCode currently uses a globally-unique primary key (id) in the DB schema.
+    # That means the same color code ID cannot exist in multiple tenants.
+    # To avoid 500s on duplicate inserts (and to keep tests idempotent), treat duplicates as 409.
+    existing = db.query(ColorCode).filter(ColorCode.id == data.id).first()
 
     if existing:
         raise HTTPException(
@@ -94,7 +94,15 @@ async def create_color_code(
     )
 
     db.add(color_code)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Color code {data.id} already exists"
+        )
+
     db.refresh(color_code)
 
     return {
@@ -231,11 +239,8 @@ async def create_formula(
     """Create a new tint formula."""
     import uuid
 
-    # Verify color code exists
-    color_code = db.query(ColorCode).filter(
-        ColorCode.id == data.color_code_id,
-        ColorCode.tenant_id == tenant_id
-    ).first()
+    # Verify color code exists (ColorCode.id is globally unique in DB schema)
+    color_code = db.query(ColorCode).filter(ColorCode.id == data.color_code_id).first()
 
     if not color_code:
         raise HTTPException(
@@ -343,14 +348,10 @@ async def calculate_paint_formula(
 ):
     """Calculate the materials needed for a paint sale."""
     # Check if color code exists, create if not
-    color_code = db.query(ColorCode).filter(
-        ColorCode.id == request.color_code,
-        ColorCode.tenant_id == tenant_id
-    ).first()
+    color_code = db.query(ColorCode).filter(ColorCode.id == request.color_code).first()
 
     if not color_code:
         # Auto-create color code if it doesn't exist
-        import uuid
         color_code = ColorCode(
             id=request.color_code,
             name=None,  # No name provided yet
@@ -359,8 +360,15 @@ async def calculate_paint_formula(
             tenant_id=tenant_id
         )
         db.add(color_code)
-        db.commit()
-        db.refresh(color_code)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Another request (or another tenant) created this color code first.
+            db.rollback()
+            color_code = db.query(ColorCode).filter(ColorCode.id == request.color_code).first()
+
+        if color_code:
+            db.refresh(color_code)
 
     # Get the active formula for this color code
     formula = db.query(TintFormula).filter(

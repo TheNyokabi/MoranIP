@@ -68,8 +68,12 @@ export default function MembersSettingsPage({ params }: { params: { tenantSlug: 
     const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
     const [memberToRemove, setMemberToRemove] = useState<TenantMembership | null>(null)
 
-    // Check if user has admin permissions
-    const isAdmin = user?.isSuperAdmin || false // TODO: Add proper role check
+    // Check if user has admin permissions based on current membership role
+    const currentMembership = currentTenant?.memberships?.find(m => m.user_id === user?.id);
+    const hasAdminAccess = user?.isSuperAdmin ||
+        currentMembership?.role === 'OWNER' ||
+        currentMembership?.role === 'ADMIN';
+    const isAdmin = hasAdminAccess;
 
     useEffect(() => {
         if (!isAdmin) {

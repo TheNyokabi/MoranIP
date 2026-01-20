@@ -702,11 +702,23 @@ async def create_invoice(
         amount = rate * item.qty
         
         # Prepare item data for invoice
+        income_account = (
+            item_detail.get("income_account")
+            or item_detail.get("default_income_account")
+            or f"Sales - {company}"
+        )
+        expense_account = (
+            item_detail.get("expense_account")
+            or item_detail.get("default_expense_account")
+            or f"Cost of Goods Sold - {company}"
+        )
         item_data = {
             "item_code": item.item_code,
             "qty": item.qty,
             "warehouse": warehouse,
-            "rate": rate
+            "rate": rate,
+            "income_account": income_account,
+            "expense_account": expense_account
         }
         items_data.append(item_data)
         

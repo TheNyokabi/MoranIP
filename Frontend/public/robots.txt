@@ -1,0 +1,10 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow API routes and admin pages
+Disallow: /api/
+Disallow: /w/*/settings/
+
+# Sitemap location
+Sitemap: https://moran.erp/sitemap.xml

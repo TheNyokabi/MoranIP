@@ -28,7 +28,33 @@ export class ErrorBoundary extends Component<Props, State> {
 
         // Log to error tracking service in production
         if (process.env.NODE_ENV === 'production') {
-            // TODO: Send to error tracking service (e.g., Sentry)
+            // Send error to backend error logging endpoint
+            // Uses navigator.sendBeacon for reliability (fire-and-forget)
+            const errorPayload = JSON.stringify({
+                error: {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                },
+                componentStack: errorInfo?.componentStack,
+                url: typeof window !== 'undefined' ? window.location.href : '',
+                timestamp: new Date().toISOString(),
+                userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            });
+
+            // Try beacon API first (most reliable for error reporting)
+            if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+                navigator.sendBeacon('/api/errors/report', new Blob([errorPayload], { type: 'application/json' }));
+            } else {
+                // Fallback to fetch for older browsers
+                fetch('/api/errors/report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: errorPayload,
+                }).catch(() => {
+                    // Silently fail - error reporting should not cause more errors
+                });
+            }
         }
     }
 
