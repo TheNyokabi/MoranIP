@@ -203,7 +203,9 @@ Create Stock Entry
     
     ${data}=    Create Dictionary
     ...    doctype=Stock Entry
+    ...    purpose=Material Receipt
     ...    stock_entry_type=Material Receipt
+    ...    to_warehouse=${warehouse}
     ...    company=${COMPANY}
     ...    items=${items}
     Run Keyword If    '${POSTING_DATE}' != '${EMPTY}'    Set To Dictionary    ${data}    posting_date=${POSTING_DATE}
@@ -325,10 +327,12 @@ Verify Field Value
     [Documentation]    Verify field value in response
     ${data}=    Get Response Data    ${response}
     ${actual_value}=    Get From Dictionary    ${data}    ${field}
-    ${expected_is_num}=    Run Keyword And Return Status    Should Be A Number    ${expected_value}
-    ${actual_is_num}=      Run Keyword And Return Status    Should Be A Number    ${actual_value}
+    ${expected_is_num}=    Run Keyword And Return Status    Convert To Number    ${expected_value}
+    ${actual_is_num}=      Run Keyword And Return Status    Convert To Number    ${actual_value}
     IF    ${expected_is_num} and ${actual_is_num}
-        Should Be Equal As Numbers    ${actual_value}    ${expected_value}
+        ${expected_num}=    Convert To Number    ${expected_value}
+        ${actual_num}=      Convert To Number    ${actual_value}
+        Should Be Equal As Numbers    ${actual_num}    ${expected_num}
     ELSE
         Should Be Equal    ${actual_value}    ${expected_value}
     END

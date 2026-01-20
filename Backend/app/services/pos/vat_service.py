@@ -35,17 +35,28 @@ class VATService:
         if not is_vatable:
             # Non-VATable invoice - return zero VAT
             total_amount = sum(item.get('amount', 0) for item in items)
+            items_breakdown = [
+                {
+                    **item,
+                    'vat_amount': 0.0,
+                    'net_amount': round(item.get('amount', 0), 2),
+                    'vat_rate': 0.0
+                }
+                for item in items
+            ]
             return {
                 'total_amount': round(total_amount, 2),
                 'total_base': round(total_amount, 2),
                 'total_vat': 0.0,
-                'items': [
+                'items': items_breakdown,
+                'vat_breakdown': [
                     {
-                        **item,
-                        'vat_amount': 0.0,
-                        'net_amount': round(item.get('amount', 0), 2)
+                        "item_code": i.get("item_code"),
+                        "net_amount": i.get("net_amount"),
+                        "vat_amount": i.get("vat_amount"),
+                        "vat_rate": i.get("vat_rate")
                     }
-                    for item in items
+                    for i in items_breakdown
                 ]
             }
 
@@ -75,7 +86,16 @@ class VATService:
             'total_amount': round(total_amount, 2),
             'total_base': round(total_base, 2),
             'total_vat': round(total_vat, 2),
-            'items': processed_items
+            'items': processed_items,
+            'vat_breakdown': [
+                {
+                    "item_code": i.get("item_code"),
+                    "net_amount": i.get("net_amount"),
+                    "vat_amount": i.get("vat_amount"),
+                    "vat_rate": i.get("vat_rate")
+                }
+                for i in processed_items
+            ]
         }
 
     def get_vat_account(self, company: str, vat_type: Optional[str] = None) -> str:

@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Safe Area Insets for Modern Mobile Devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-inset-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-area-inset-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .safe-area-pb {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-area-pt {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+}
+
 @layer base {
   :root {
     /* Enhanced Light Mode - Better Contrast & Visibility */
@@ -103,28 +130,32 @@
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  
+
   /* Enhanced light mode card shadows for depth */
   .light-card {
     @apply bg-card text-card-foreground;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
     border: 1px solid hsl(var(--border));
   }
-  
+
   .light-card-elevated {
     @apply bg-card text-card-foreground;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     border: 1px solid hsl(var(--border));
   }
-  
+
   /* Better input visibility in light mode */
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     @apply border-input;
     border-color: hsl(var(--input));
     background: hsl(var(--background));
   }
-  
-  input:focus, textarea:focus, select:focus {
+
+  input:focus,
+  textarea:focus,
+  select:focus {
     border-color: hsl(var(--ring));
     box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
   }
@@ -152,22 +183,22 @@
   .bg-obsidian-elevated {
     background: hsl(var(--obsidian-elevated));
   }
-  
+
   /* Enhanced Light Mode Utilities */
   .light-mode-card {
     @apply bg-white border border-gray-200 rounded-lg;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   }
-  
+
   .light-mode-card-hover {
     @apply light-mode-card transition-all duration-200;
   }
-  
+
   .light-mode-card-hover:hover {
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     transform: translateY(-1px);
   }
-  
+
   /* Better button visibility in light mode */
   .btn-primary-light {
     @apply bg-primary text-primary-foreground;
@@ -176,21 +207,21 @@
     font-weight: 500;
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
-  
+
   .btn-primary-light:hover {
     background: hsl(221 83% 48%);
     box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.1);
   }
-  
+
   /* Enhanced text visibility */
   .text-visible {
     color: hsl(var(--foreground));
   }
-  
+
   .text-muted-visible {
     color: hsl(var(--muted-foreground));
   }
-  
+
   /* Better border visibility */
   .border-visible {
     border-color: hsl(var(--border));
@@ -555,10 +586,22 @@
   font-size: var(--base-font-size) !important;
 }
 
-.large-text h1 { font-size: calc(var(--base-font-size) * 2) !important; }
-.large-text h2 { font-size: calc(var(--base-font-size) * 1.75) !important; }
-.large-text h3 { font-size: calc(var(--base-font-size) * 1.5) !important; }
-.large-text h4 { font-size: calc(var(--base-font-size) * 1.25) !important; }
+.large-text h1 {
+  font-size: calc(var(--base-font-size) * 2) !important;
+}
+
+.large-text h2 {
+  font-size: calc(var(--base-font-size) * 1.75) !important;
+}
+
+.large-text h3 {
+  font-size: calc(var(--base-font-size) * 1.5) !important;
+}
+
+.large-text h4 {
+  font-size: calc(var(--base-font-size) * 1.25) !important;
+}
+
 .large-text button,
 .large-text input,
 .large-text select,
@@ -599,6 +642,7 @@
 
 /* Reduce Motion */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -666,6 +710,7 @@
 
 /* Kenya-Specific Accessibility */
 @media (max-width: 768px) {
+
   /* Mobile optimizations for Kenya's device landscape */
   .touch-target {
     min-height: 44px;
@@ -673,7 +718,8 @@
   }
 
   /* Larger buttons for touch devices common in Kenya */
-  button, .btn {
+  button,
+  .btn {
     min-height: 48px;
     padding: 12px 16px;
   }
@@ -687,6 +733,7 @@
 
 /* Low Vision Support */
 @media (max-resolution: 150dpi) {
+
   /* High DPI optimizations */
   .high-contrast-text {
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);

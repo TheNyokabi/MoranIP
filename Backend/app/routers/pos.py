@@ -155,24 +155,35 @@ async def get_item_stock(
     
     try:
         # Try using the ERPNext method first
-        params = {"item_code": item_code}
-        if warehouse:
-            params["warehouse"] = warehouse
-        
-        stock = erpnext_adapter.proxy_request(
-            tenant_id=tenant_id,
-            path="method/erpnext.stock.utils.get_stock_balance",
-            method="GET",
-            params=params
-        )
+    params = {"item_code": item_code}
+    if warehouse:
+        params["warehouse"] = warehouse
+    
+    stock = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="method/erpnext.stock.utils.get_stock_balance",
+        method="GET",
+        params=params
+    )
         
         # Handle different response formats
         if isinstance(stock, dict):
-            qty = stock.get("qty", stock.get("stock_qty", 0))
+            if "message" in stock:
+                message = stock.get("message")
+                if isinstance(message, dict):
+                    qty = message.get("qty", message.get("stock_qty", message.get("actual_qty", 0)))
+                else:
+                    qty = message
+            else:
+                qty = stock.get("qty", stock.get("stock_qty", stock.get("actual_qty", 0)))
         elif isinstance(stock, (int, float)):
             qty = float(stock)
         else:
             qty = 0
+        
+        # If method returns 0, try stock ledger as a fallback for accuracy
+        if qty == 0:
+            raise ValueError("Stock balance returned 0; attempting ledger fallback")
         
         return {"item_code": item_code, "warehouse": warehouse, "qty": qty}
     
@@ -439,7 +450,7 @@ async def create_invoice(
     Create a PoS Sales Invoice.
     """
     logger.info(f"POS invoice creation started for tenant {tenant_id}, customer {invoice.customer}, profile {invoice.pos_profile_id}")
-
+    
     """
     This is the main transaction endpoint. It will:
     1. Fetch and validate POS Profile
@@ -814,6 +825,8 @@ async def create_invoice(
         "payments": payments_data,
         "taxes": taxes_data,
         "is_pos": 1,
+        "update_stock": 1,
+        "docstatus": 1,
         "company": company,
         "set_warehouse": profile_warehouse,  # Set warehouse for all items
         # Ensure currency matches company to avoid exchange rate errors
@@ -870,12 +883,12 @@ async def create_invoice(
     
     # Send to ERPNext
     try:
-        result = erpnext_adapter.proxy_request(
-            tenant_id=tenant_id,
-            path="resource/Sales Invoice",
-            method="POST",
-            json_data=payload
-        )
+    result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Sales Invoice",
+        method="POST",
+        json_data=payload
+    )
         logger.info(f"Invoice created successfully for tenant {tenant_id}, customer {invoice.customer}")
     except HTTPException:
         raise
@@ -1016,12 +1029,12 @@ async def get_cash_summary(
         params["to_date"] = to_date
     
     try:
-        result = erpnext_adapter.proxy_request(
-            tenant_id=tenant_id,
-            path="method/paint_shop_custom.get_cash_summary",
-            method="GET",
-            params=params
-        )
+    result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="method/paint_shop_custom.get_cash_summary",
+        method="GET",
+        params=params
+    )
         return ResponseNormalizer.normalize_erpnext(result)
     except Exception:
         # Fallback when custom method is unavailable
@@ -1079,10 +1092,10 @@ async def get_daily_summary(
     # Get sales invoices - use basic fields only to avoid ERPNext field issues
     invoice_fields = ["name", "grand_total", "customer", "posting_date"]
     try:
-        invoices = erpnext_adapter.proxy_request(
-            tenant_id=tenant_id,
-            path="resource/Sales Invoice",
-            method="GET",
+    invoices = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Sales Invoice",
+        method="GET",
             params={
                 "limit_page_length": 500,
                 "fields": json.dumps(invoice_fields),

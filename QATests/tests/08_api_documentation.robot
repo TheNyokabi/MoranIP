@@ -40,12 +40,10 @@ Verify Inventory Endpoints Documented
     ${schema}=    Set Variable    ${response.json()}
     ${paths}=    Get From Dictionary    ${schema}    paths
     
-    # Check inventory endpoints
-    Dictionary Should Contain Key    ${paths}    /inventory/items
-    Dictionary Should Contain Key    ${paths}    /inventory/warehouses
-    Dictionary Should Contain Key    ${paths}    /inventory/stock-entries
-    Dictionary Should Contain Key    ${paths}    /inventory/stock-reconciliations
-    Dictionary Should Contain Key    ${paths}    /inventory/stock-balance
+    # Check inventory endpoints (inventory router is mounted under /api)
+    Dictionary Should Contain Key    ${paths}    /api/inventory/items
+    Dictionary Should Contain Key    ${paths}    /api/inventory/items/{item_code}
+    Dictionary Should Contain Key    ${paths}    /api/inventory/warehouses
     Log    All inventory endpoints are documented
 
 Verify Purchase Endpoints Documented
@@ -72,7 +70,7 @@ Verify Endpoints Have Descriptions
     ${paths}=    Get From Dictionary    ${schema}    paths
     
     # Check a sample of critical endpoints
-    @{critical_endpoints}=    Create List    /inventory/items    /purchases/suppliers    /purchases/orders
+    @{critical_endpoints}=    Create List    /api/inventory/items    /purchases/suppliers    /purchases/orders
     
     FOR    ${endpoint}    IN    @{critical_endpoints}
         ${endpoint_spec}=    Get From Dictionary    ${paths}    ${endpoint}

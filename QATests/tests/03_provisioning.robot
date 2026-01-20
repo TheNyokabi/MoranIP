@@ -32,8 +32,8 @@ Invite New User To Tenant
     
     ${resp}=       POST On Session      moran_api    /iam/tenants/${NEW_TENANT_ID}/invite    json=${body}    headers=${headers}    expected_status=200
     
-    Dictionary Should Contain Key    ${resp.json()}    code
-    Should Be Equal As Strings       ${resp.json()['code']}    INVITED_NEW
+    Dictionary Should Contain Key    ${resp.json()}    type
+    Should Be Equal As Strings       ${resp.json()['type']}    INVITED_NEW
 
 Invite Existing User To Tenant
     [Documentation]    Verify inviting an existing user (the admin we just created)
@@ -47,5 +47,5 @@ Invite Existing User To Tenant
     
     ${resp}=       POST On Session      moran_api    /iam/tenants/${NEW_TENANT_ID}/invite    json=${body}    headers=${headers}    expected_status=200
     
-    Dictionary Should Contain Key    ${resp.json()}    code
-    Should Be Equal As Strings       ${resp.json()['code']}    INVITED_EXISTING
+    Dictionary Should Contain Key    ${resp.json()}    type
+    Should Be Equal As Strings       ${resp.json()['type']}    INVITED_EXISTING

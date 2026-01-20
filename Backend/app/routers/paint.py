@@ -415,12 +415,16 @@ async def calculate_paint_formula(
             if isinstance(item_data, dict) and item_data.get("data"):
                 item_info = item_data["data"]
                 unit_cost = item_info.get("valuation_rate", item_info.get("standard_rate", 0))
+                try:
+                    unit_cost = float(unit_cost) if unit_cost is not None else 0.0
+                except (TypeError, ValueError):
+                    unit_cost = 0.0
                 tint_cost = unit_cost * tint_quantity
                 total_tint_cost += tint_cost
             else:
-                unit_cost = 0
+                unit_cost = 0.0
         except:
-            unit_cost = 0
+            unit_cost = 0.0
 
         tints.append({
             "item_code": component.tint_item_code,
@@ -440,12 +444,16 @@ async def calculate_paint_formula(
         if isinstance(base_item_data, dict) and base_item_data.get("data"):
             base_item_info = base_item_data["data"]
             base_unit_cost = base_item_info.get("valuation_rate", base_item_info.get("standard_rate", 0))
+            try:
+                base_unit_cost = float(base_unit_cost) if base_unit_cost is not None else 0.0
+            except (TypeError, ValueError):
+                base_unit_cost = 0.0
             base_paint_cost = base_unit_cost * base_paint_quantity
         else:
-            base_unit_cost = 0
+            base_unit_cost = 0.0
             base_paint_cost = 0
     except:
-        base_unit_cost = 0
+        base_unit_cost = 0.0
         base_paint_cost = 0
 
     base_paint = {

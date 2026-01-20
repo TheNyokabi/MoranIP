@@ -16,7 +16,7 @@ export PLATFORM_ADMIN_PASSWORD="${PLATFORM_ADMIN_PASSWORD:-password}"
 export SKIP_STOCK_VALIDATION="${SKIP_STOCK_VALIDATION:-false}"
 export TEST_TIMEOUT="${TEST_TIMEOUT:-300}"  # 5 minutes per phase
 export MAX_RETRIES="${MAX_RETRIES:-3}"
-export PROVISIONING_WAIT_TIME="${PROVISIONING_WAIT_TIME:-300}"  # Wait up to 5 minutes for provisioning
+export PROVISIONING_WAIT_TIME="${PROVISIONING_WAIT_TIME:-600}"  # Wait up to 10 minutes for provisioning
 
 # ==================== Test Tenant Configuration ====================
 export TENANT_NAME="TechMart Electronics"

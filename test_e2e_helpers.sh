@@ -246,12 +246,44 @@ get_user_id() {
 
 get_invoice_id() {
     local response="$1"
-    extract_field "$response" "invoice.name" || extract_field "$response" "name"
+    local value
+    value=$(extract_field "$response" "invoice.name")
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+        echo "$value"
+        return
+    fi
+    value=$(extract_field "$response" "data.name")
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+        echo "$value"
+        return
+    fi
+    value=$(extract_field "$response" "data.data.name")
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+        echo "$value"
+        return
+    fi
+    extract_field "$response" "name"
 }
 
 get_invoice_name() {
     local response="$1"
-    extract_field "$response" "invoice.name" || extract_field "$response" "name"
+    local value
+    value=$(extract_field "$response" "invoice.name")
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+        echo "$value"
+        return
+    fi
+    value=$(extract_field "$response" "data.name")
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+        echo "$value"
+        return
+    fi
+    value=$(extract_field "$response" "data.data.name")
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+        echo "$value"
+        return
+    fi
+    extract_field "$response" "name"
 }
 
 get_warehouse_name() {

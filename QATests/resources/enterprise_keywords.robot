@@ -31,6 +31,8 @@ Setup Enterprise Test Environment
 
 Setup Platform Session
     [Documentation]    Setup API session with authentication
+    ${platform_url}=    Get Environment Variable    API_URL    ${PLATFORM_URL}
+    Set Suite Variable    ${PLATFORM_URL}    ${platform_url}
     Create Session    platform    ${PLATFORM_URL}
     ${headers}=    Create Dictionary    Authorization=Bearer ${ACCESS_TOKEN}    Content-Type=application/json
     Set Suite Variable    ${HEADERS}    ${headers}

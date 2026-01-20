@@ -808,13 +808,22 @@ async def submit_stock_entry(
     current_user: dict = Depends(get_current_user)
 ):
     """Submit a stock entry (moves from Draft to Submitted)."""
+    entry = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path=f"resource/Stock Entry/{entry_name}",
+        method="GET"
+    )
+    entry_data = entry.get("data") if isinstance(entry, dict) and "data" in entry else entry
+    if not entry_data:
+        raise HTTPException(status_code=404, detail="Stock Entry not found")
     result = erpnext_adapter.proxy_request(
         tenant_id=tenant_id,
         path="method/frappe.client.submit",
         method="POST",
         json_data={
-            "doctype": "Stock Entry",
-            "name": entry_name
+            "doc": {
+                **entry_data
+            }
         }
     )
     return ResponseNormalizer.normalize_erpnext(result)

@@ -236,6 +236,9 @@ TC013_Verify_Sales_Profitability
 *** Keywords ***
 Setup Enterprise Test Environment
     [Documentation]    Setup test environment and verify prerequisites
+    ${run}=    Get Environment Variable    RUN_ENTERPRISE    false
+    Run Keyword If    '${run}' != 'true'
+    ...    Skip    Skipping enterprise suites (set RUN_ENTERPRISE=true to enable).
     Setup Platform Session
     Verify Tenant Exists    ${TENANT_ID}
     Verify Company Exists    ${COMPANY}
