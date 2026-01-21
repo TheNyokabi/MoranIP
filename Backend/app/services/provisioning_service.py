@@ -856,6 +856,41 @@ class ProvisioningService:
                         else:
                             raise
 
+            # ---- Ensure Fiscal Year(s) ----
+            # Create fiscal years for current year and next 2 years to prevent
+            # "Date is not in any active Fiscal Year" errors when submitting stock entries
+            from datetime import datetime
+            current_year = datetime.now().year
+            fiscal_years_to_create = [
+                {"year": str(current_year), "start": f"{current_year}-01-01", "end": f"{current_year}-12-31"},
+                {"year": str(current_year + 1), "start": f"{current_year + 1}-01-01", "end": f"{current_year + 1}-12-31"},
+                {"year": str(current_year + 2), "start": f"{current_year + 2}-01-01", "end": f"{current_year + 2}-12-31"},
+            ]
+            
+            for fy in fiscal_years_to_create:
+                try:
+                    erpnext_adapter.get_resource("Fiscal Year", fy["year"], tenant_id)
+                    logger.debug(f"[{correlation_id}] Fiscal Year '{fy['year']}' already exists")
+                except HTTPException as e:
+                    if e.status_code != 404:
+                        raise
+                    
+                    try:
+                        erpnext_adapter.create_resource(
+                            "Fiscal Year",
+                            {
+                                "year": fy["year"],
+                                "year_start_date": fy["start"],
+                                "year_end_date": fy["end"],
+                                "disabled": 0
+                            },
+                            tenant_id,
+                        )
+                        logger.info(f"[{correlation_id}] Created Fiscal Year: {fy['year']}")
+                    except HTTPException as create_err:
+                        if create_err.status_code != 409:
+                            logger.warning(f"[{correlation_id}] Failed to create Fiscal Year '{fy['year']}': {create_err}")
+
 
             return StepResult(
                 step_name="step_1_platform_setup",
