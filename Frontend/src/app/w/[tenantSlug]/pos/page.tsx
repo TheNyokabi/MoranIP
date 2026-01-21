@@ -195,10 +195,14 @@ export default function POSPage() {
                 const profiles = profilesRes?.profiles || []
                 setPosProfiles(profiles)
                 setCustomers(customersRes.customers || [])
+                // Filter out group warehouses (is_group = 1) - they cannot be used for transactions
                 const warehouses = warehousesRes?.warehouses || []
-                setAvailableWarehouses(warehouses)
-                if (warehouses.length > 0 && !selectedWarehouse) {
-                    const firstWarehouse = warehouses[0]
+                const transactionWarehouses = warehouses.filter(
+                    (w: any) => w.is_group === 0 || w.is_group === false
+                )
+                setAvailableWarehouses(transactionWarehouses)
+                if (transactionWarehouses.length > 0 && !selectedWarehouse) {
+                    const firstWarehouse = transactionWarehouses[0]
                     const warehouseName = firstWarehouse.name || firstWarehouse.warehouse_name
                     const profileId = firstWarehouse.profile_id
                     if (warehouseName) {
@@ -587,7 +591,9 @@ export default function POSPage() {
                         <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
                             Point of Sale
                         </h1>
-                        <p className="text-white/50 text-sm">Paint Shop Ltd - PoS Terminal</p>
+                        <p className="text-white/50 text-sm">
+                            {currentTenant?.name || tenantSlug} - PoS Terminal
+                        </p>
                     </div>
                     <div className="flex items-center gap-4">
                         {/* Session Info */}
@@ -641,7 +647,7 @@ export default function POSPage() {
 
                 {/* Quick Stats - Responsive grid */}
                 {summary && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                         <Card className="bg-white/5 border-white/10">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">

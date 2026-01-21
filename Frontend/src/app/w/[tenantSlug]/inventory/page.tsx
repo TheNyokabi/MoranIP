@@ -164,7 +164,9 @@ export default function InventoryPage() {
                         console.error("Failed to fetch warehouses:", err);
                         return [];
                     }),
-                erpNextApi.listResource<StockEntry>(token, "Stock Entry", { limit: "50" }).catch(() => []),
+                apiFetch<{ data?: StockEntry[]; entries?: StockEntry[] }>("/api/inventory/stock-entries?limit=50", {}, token)
+                    .then(res => res.data || res.entries || [])
+                    .catch(() => []),
                 erpNextApi.getResource<any>(token, "Stock%20Settings", "Stock%20Settings").catch(err => {
                     console.error("Failed to fetch stock settings:", err);
                     return null;
@@ -195,7 +197,8 @@ export default function InventoryPage() {
                 levelsByWarehouse[wh.name] = {};
             }
 
-            for (const item of itemsData.slice(0, 20)) { // Limit to first 20 for performance
+            const itemsToCheck = itemsData.length <= 50 ? itemsData : itemsData.slice(0, 20);
+            for (const item of itemsToCheck) { // Small catalogs: show accurate totals
                 let totalQty = 0;
                 try {
                     // Get total stock across all warehouses
@@ -964,11 +967,15 @@ export default function InventoryPage() {
                                         <div className="space-y-2">
                                             <div className="flex items-center text-sm text-muted-foreground">
                                                 <span className="font-medium mr-2">Items:</span>
-                                                <span className="text-foreground">{entry.items?.length || 0} items</span>
+                                                <span className="text-foreground">{(entry as any).items_count ?? entry.items?.length ?? 0} items</span>
+                                            </div>
+                                            <div className="flex items-center text-sm text-muted-foreground">
+                                                <span className="font-medium mr-2">Total Qty:</span>
+                                                <span className="text-foreground">{(entry as any).total_qty ?? 0}</span>
                                             </div>
                                             <div className="flex items-center text-sm text-muted-foreground">
                                                 <span className="font-medium mr-2">Company:</span>
-                                                <span className="text-foreground">{entry.company}</span>
+                                                <span className="text-foreground">{entry.company || '-'}</span>
                                             </div>
                                             {entry.posting_date && (
                                                 <div className="flex items-center text-sm text-muted-foreground">
@@ -977,25 +984,6 @@ export default function InventoryPage() {
                                                 </div>
                                             )}
                                         </div>
-
-                                        {/* Item details */}
-                                        {entry.items && entry.items.length > 0 && (
-                                            <div className="mt-3 pt-3 border-t border-border dark:border-white/5 space-y-1">
-                                                {entry.items.map((item, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between text-sm">
-                                                        <span className="text-muted-foreground">{item.item_code}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge variant="secondary" className="bg-muted dark:bg-white/10 text-foreground">
-                                                                Qty: {item.qty}
-                                                            </Badge>
-                                                            {item.t_warehouse && (
-                                                                <span className="text-muted-foreground text-xs">→ {item.t_warehouse}</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
                                     </div>
                                 ))}
                             </div>

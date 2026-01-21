@@ -1356,7 +1356,28 @@ async def list_stock_entries(
 ):
     """List stock entries with optional filters."""
     import json
-    params = {"limit_page_length": limit}
+    params = {
+        "limit_page_length": limit,
+        "order_by": "posting_date desc, posting_time desc, modified desc",
+        "fields": json.dumps(
+            [
+                "name",
+                "docstatus",
+                "stock_entry_type",
+                "purpose",
+                "company",
+                "posting_date",
+                "posting_time",
+                "from_warehouse",
+                "to_warehouse",
+                "total_incoming_value",
+                "total_outgoing_value",
+                "total_amount",
+                "remarks",
+                "modified",
+            ]
+        ),
+    }
     
     filters = []
     if stock_entry_type:
@@ -1375,7 +1396,67 @@ async def list_stock_entries(
         method="GET",
         params=params
     )
-    return {"data": entries.get("data", []) if isinstance(entries, dict) else (entries or [])}
+
+    entry_rows = entries.get("data", []) if isinstance(entries, dict) else (entries or [])
+    if not isinstance(entry_rows, list):
+        entry_rows = []
+
+    # Compute item counts and total qty per stock entry.
+    # ERPNext list endpoints do not return child tables by default.
+    try:
+        names = [e.get("name") for e in entry_rows if isinstance(e, dict) and e.get("name")]
+        if names:
+            detail_params = {
+                "filters": json.dumps([["parent", "in", names]]),
+                "fields": json.dumps(["parent", "qty"]),
+                "limit_page_length": min(5000, max(500, limit * 200)),
+            }
+            details = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Stock Entry Detail",
+                method="GET",
+                params=detail_params,
+            )
+            detail_rows = details.get("data", []) if isinstance(details, dict) else (details or [])
+            if not isinstance(detail_rows, list):
+                detail_rows = []
+
+            stats: dict[str, dict[str, float]] = {}
+            for row in detail_rows:
+                if not isinstance(row, dict):
+                    continue
+                parent = row.get("parent")
+                if not parent:
+                    continue
+                try:
+                    qty = float(row.get("qty") or 0)
+                except Exception:
+                    qty = 0.0
+                if parent not in stats:
+                    stats[parent] = {"items_count": 0.0, "total_qty": 0.0}
+                stats[parent]["items_count"] += 1.0
+                stats[parent]["total_qty"] += qty
+
+            for entry in entry_rows:
+                if not isinstance(entry, dict):
+                    continue
+                s = stats.get(entry.get("name") or "")
+                entry["items_count"] = int(s["items_count"]) if s else 0
+                entry["total_qty"] = float(s["total_qty"]) if s else 0.0
+        else:
+            for entry in entry_rows:
+                if isinstance(entry, dict):
+                    entry["items_count"] = 0
+                    entry["total_qty"] = 0.0
+    except Exception:
+        # Non-blocking: listing should still work even if we cannot compute child stats.
+        for entry in entry_rows:
+            if isinstance(entry, dict):
+                entry.setdefault("items_count", 0)
+                entry.setdefault("total_qty", 0.0)
+
+    # Back-compat: older frontend code expects `entries`, newer uses `data`.
+    return {"data": entry_rows, "entries": entry_rows}
 
 
 @router.get("/stock-entries/{entry_name}")

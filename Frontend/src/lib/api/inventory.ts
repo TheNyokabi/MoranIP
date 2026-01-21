@@ -106,8 +106,8 @@ export async function getStockEntries(params?: StockEntriesQuery): Promise<Stock
     if (params?.from_date) queryParams.append('from_date', params.from_date);
     if (params?.to_date) queryParams.append('to_date', params.to_date);
 
-    const data = await apiGet<{ entries: StockEntry[] }>(`/inventory/stock-entries?${queryParams}`);
-    return data.entries;
+    const data = await apiGet<{ data?: StockEntry[]; entries?: StockEntry[] }>(`/inventory/stock-entries?${queryParams}`);
+    return data.entries || data.data || [];
 }
 
 export async function createStockReconciliation(data: StockReconciliation): Promise<void> {

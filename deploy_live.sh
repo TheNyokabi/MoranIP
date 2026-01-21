@@ -46,28 +46,39 @@ ensure_erpnext_site() {
   # If the site directory exists but is incomplete, ERPNext will return 404 "<site> does not exist".
   # Repair by removing the broken site directory and re-running the site creator.
   if docker-compose exec -T erpnext bash -lc "test -f '${site_config_path}'" >/dev/null 2>&1; then
-    echo "ERPNext site '${site_name}' looks healthy (site_config.json present)."
-    return 0
+    echo "ERPNext site '${site_name}' looks present (site_config.json found)."
+  else
+    echo "ERPNext site '${site_name}' is missing site_config.json; recreating site..."
+    docker-compose exec -T erpnext bash -lc "rm -rf '/home/frappe/frappe-bench/sites/${site_name}'" || true
+    docker-compose up -d create-site || true
+
+    echo "Restarting ERPNext to pick up recreated site..."
+    docker-compose restart erpnext
   fi
 
-  echo "ERPNext site '${site_name}' is missing site_config.json; recreating site..."
-  docker-compose exec -T erpnext bash -lc "rm -rf '/home/frappe/frappe-bench/sites/${site_name}'" || true
-  docker-compose up -d create-site || true
-
-  echo "Restarting ERPNext to pick up recreated site..."
-  docker-compose restart erpnext
-
   echo "Waiting for ERPNext ping to succeed..."
+  local ping_ok=0
   for i in {1..60}; do
     if curl -fsS "http://localhost:9010/api/method/ping" >/dev/null 2>&1; then
       echo "ERPNext ping OK."
-      return 0
+      ping_ok=1
+      break
     fi
     sleep 2
   done
 
-  echo "ERPNext did not become healthy in time. Check: docker-compose logs --tail 200 erpnext create-site"
-  return 1
+  if [[ "$ping_ok" != "1" ]]; then
+    echo "ERPNext did not become healthy in time. Check: docker-compose logs --tail 200 erpnext create-site"
+    return 1
+  fi
+
+  echo "Running ERPNext migrations for site '${site_name}' (schema sync + patches)..."
+  # Some runtime 500s are caused by schema drift (e.g., missing columns) even when the site exists.
+  # This is safe to run repeatedly.
+  docker-compose exec -T erpnext bash -lc "cd /home/frappe/frappe-bench/sites && python -m frappe.utils.bench_helper frappe --site '${site_name}' migrate"
+
+  echo "ERPNext site '${site_name}' ready."
+  return 0
 }
 
 ensure_erpnext_site "${ERPNEXT_SITE:-moran.localhost}"

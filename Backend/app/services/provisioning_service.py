@@ -891,6 +891,32 @@ class ProvisioningService:
                         if create_err.status_code != 409:
                             logger.warning(f"[{correlation_id}] Failed to create Fiscal Year '{fy['year']}': {create_err}")
 
+            # ---- Ensure Default Customer for POS ----
+            # Create a default "Walk-in Customer" for POS transactions
+            default_customer_name = "Walk-in Customer"
+            try:
+                erpnext_adapter.get_resource("Customer", default_customer_name, tenant_id)
+                logger.debug(f"[{correlation_id}] Customer '{default_customer_name}' already exists")
+            except HTTPException as e:
+                if e.status_code != 404:
+                    raise
+                
+                try:
+                    erpnext_adapter.create_resource(
+                        "Customer",
+                        {
+                            "customer_name": default_customer_name,
+                            "customer_type": "Individual",
+                            "customer_group": "Individual",
+                            "territory": "All Territories",
+                        },
+                        tenant_id,
+                    )
+                    logger.info(f"[{correlation_id}] Created default customer: {default_customer_name}")
+                except HTTPException as create_err:
+                    if create_err.status_code != 409:
+                        logger.warning(f"[{correlation_id}] Failed to create default customer: {create_err}")
+
 
             return StepResult(
                 step_name="step_1_platform_setup",
