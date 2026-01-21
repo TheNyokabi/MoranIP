@@ -29,6 +29,10 @@ async function proxy(req: NextRequest, params: { path: string[] }) {
 
     // Next adds host-specific headers that can confuse upstream.
     headers.delete('host');
+    // Prevent undici RequestContentLengthMismatchError when clients (e.g. curl)
+    // send Content-Length headers that don't match the forwarded body.
+    headers.delete('content-length');
+    headers.delete('transfer-encoding');
 
     // Read body once so we can safely retry on 404 without re-consuming the stream.
     const hasBody = !(req.method === 'GET' || req.method === 'HEAD');

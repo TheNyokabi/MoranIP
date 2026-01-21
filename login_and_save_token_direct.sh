@@ -10,7 +10,7 @@ echo ""
 
 # Configuration
 BACKEND_URL="${BACKEND_URL:-http://localhost:9000}"
-LOGIN_ENDPOINT="${BACKEND_URL}/auth/login"
+LOGIN_ENDPOINT="${BACKEND_URL}/api/auth/login"
 
 # Default credentials
 EMAIL="${EMAIL:-admin@moran.com}"
@@ -92,7 +92,7 @@ except:
         echo "💡 Example authenticated request:"
         echo "   curl -H \"Authorization: Bearer \$AUTH_TOKEN\" \\"
         echo "        -H \"X-Tenant-ID: YOUR_TENANT_ID\" \\"
-        echo "        ${BACKEND_URL}/pos/items"
+        echo "        ${BACKEND_URL}/api/pos/items"
         echo ""
         echo "💡 Or via frontend proxy (once frontend is configured):"
         echo "   curl -H \"Authorization: Bearer \$AUTH_TOKEN\" \\"

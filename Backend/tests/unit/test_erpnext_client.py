@@ -1,4 +1,5 @@
 """Unit tests for ERPNext client adapter."""
+import json
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from fastapi import HTTPException
@@ -131,6 +132,74 @@ class TestERPNextClientAdapter:
             adapter.proxy_request("test-tenant", "resource/Item", method="GET")
         assert exc_info.value.status_code == 500
         assert "Plain text error" in str(exc_info.value.detail)
+
+    @patch.object(ERPNextClientAdapter, '_login')
+    def test_proxy_request_stock_shortage_normalized(self, mock_login, adapter):
+        """Stock shortage (negative stock) should normalize into insufficient_stock."""
+        mock_login.return_value = True
+        adapter.cookie_jar = {"sid": "test-session-id"}
+        adapter._current_tenant = "test-tenant"
+
+        msg = (
+            "<strong>3.0 units of ITEM-001 needed in Warehouse Finished Goods - AST "
+            "for Sales Invoice ACC-SINV-2026-00066 to complete this transaction.</strong>"
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 417
+        mock_response.json.return_value = {"_server_messages": json.dumps([msg])}
+        mock_response.text = msg
+        adapter.session.request = MagicMock(return_value=mock_response)
+
+        with pytest.raises(HTTPException) as exc_info:
+            adapter.proxy_request("test-tenant", "resource/Sales Invoice", method="POST", json_data={"docstatus": 1})
+
+        assert exc_info.value.status_code == 417
+        assert isinstance(exc_info.value.detail, dict)
+        assert exc_info.value.detail.get("type") == "insufficient_stock"
+        assert "<strong>" not in exc_info.value.detail.get("message", "")
+        errors = exc_info.value.detail.get("errors")
+        assert isinstance(errors, list) and errors
+        assert errors[0].get("warehouse") == "Finished Goods - AST"
+        assert errors[0].get("required_qty") == pytest.approx(3.0)
+        assert errors[0].get("voucher_type") == "Sales Invoice"
+        assert errors[0].get("voucher_no") == "ACC-SINV-2026-00066"
+
+    @patch.object(ERPNextClientAdapter, '_login')
+    def test_proxy_request_stock_shortage_with_datetime_and_customer(self, mock_login, adapter):
+        """Stock shortage variant with posting datetime and customer should parse consistently."""
+        mock_login.return_value = True
+        adapter.cookie_jar = {"sid": "test-session-id"}
+        adapter._current_tenant = "test-tenant"
+
+        msg = (
+            "4.0 units of Item 100ml: Paint 100ml needed in Warehouse Finished Goods - AST "
+            "on 2026-01-21 15:50:48.632964 for Sales Invoice Walk-In Customer to complete this transaction."
+        )
+
+        mock_response = MagicMock()
+        mock_response.status_code = 417
+        mock_response.json.return_value = {"message": msg}
+        mock_response.text = msg
+        adapter.session.request = MagicMock(return_value=mock_response)
+
+        with pytest.raises(HTTPException) as exc_info:
+            adapter.proxy_request("test-tenant", "resource/Sales Invoice", method="POST", json_data={"docstatus": 1})
+
+        assert exc_info.value.status_code == 417
+        detail = exc_info.value.detail
+        assert isinstance(detail, dict)
+        assert detail.get("type") == "insufficient_stock"
+        errors = detail.get("errors")
+        assert isinstance(errors, list) and errors
+        err0 = errors[0]
+        assert err0.get("item_code") == "100ml"
+        assert err0.get("item_name") == "Paint 100ml"
+        assert err0.get("warehouse") == "Finished Goods - AST"
+        assert err0.get("required_qty") == pytest.approx(4.0)
+        assert err0.get("posting_datetime").startswith("2026-01-21")
+        assert err0.get("voucher_type") == "Sales Invoice"
+        assert err0.get("party") == "Walk-In Customer"
     
     @patch.object(ERPNextClientAdapter, 'proxy_request')
     def test_list_resource(self, mock_proxy, adapter):

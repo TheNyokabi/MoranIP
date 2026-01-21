@@ -18,6 +18,9 @@ import { LoyaltyPointsDisplay } from "@/components/pos/LoyaltyPointsDisplay"
 import { OfflineSyncStatus } from "@/components/pos/OfflineSyncStatus"
 import { ReceiptPreview } from "@/components/pos/ReceiptPreview"
 import { AccessibilityTools } from "@/components/pos/AccessibilityTools"
+import { SaleConfirmationModal } from "@/components/pos/sale-confirmation-modal"
+import { SaleSuccessModal } from "@/components/pos/sale-success-modal"
+import { EndSessionModal } from "@/components/pos/end-session-modal"
 import {
     ShoppingCart,
     Plus,
@@ -89,6 +92,8 @@ export default function POSPage() {
     const [recentInvoices, setRecentInvoices] = useState<POSInvoice[]>([])
     const [posProfiles, setPosProfiles] = useState<any[]>([])
     const [selectedPosProfile, setSelectedPosProfile] = useState<string>('')
+    const [availableWarehouses, setAvailableWarehouses] = useState<any[]>([])
+    const [selectedWarehouse, setSelectedWarehouse] = useState<string>('')
     const [customers, setCustomers] = useState<any[]>([])
     const [selectedCustomer, setSelectedCustomer] = useState<string>('')
     const [showCustomerPicker, setShowCustomerPicker] = useState(false)
@@ -107,6 +112,10 @@ export default function POSPage() {
     // Accessibility state
     const [showAccessibilityTools, setShowAccessibilityTools] = useState(false)
 
+    // Modal states for sale flow
+    const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+
     // Paint sales state
     const [colorCodes, setColorCodes] = useState<any[]>([])
     const [selectedColorCode, setSelectedColorCode] = useState<string>('')
@@ -123,6 +132,12 @@ export default function POSPage() {
                 setSessionActive(true)
                 setSessionStartTime(new Date(session.startTime))
                 setOpeningCash(session.openingCash)
+                if (session.posProfileId) {
+                    setSelectedPosProfile(session.posProfileId)
+                }
+                if (session.warehouse) {
+                    setSelectedWarehouse(session.warehouse)
+                }
                 setShowSessionModal(false)
             }
         }
@@ -165,22 +180,57 @@ export default function POSPage() {
 
             setLoading(true)
             try {
-                const [itemsRes, summaryRes, invoicesRes, profilesRes, customersRes] = await Promise.all([
+                const [itemsRes, summaryRes, invoicesRes, profilesRes, customersRes, warehousesRes] = await Promise.all([
                     posApi.getItems(token),
                     posApi.getDailySummary(token).catch(() => null),
                     posApi.getInvoices(token, 10).catch(() => ({ invoices: [] })),
                     posApi.getPosProfiles(token).catch(() => ({ profiles: [] })), // Fetch POS profiles
-                    posApi.getCustomers(token).catch(() => ({ customers: [] })) // Fetch customers
+                    posApi.getCustomers(token).catch(() => ({ customers: [] })), // Fetch customers
+                    apiFetch('/pos/warehouses', {}, token).catch(() => ({ warehouses: [] }))
                 ])
-                setItems(itemsRes.items || [])
+                const loadedItems = (itemsRes.items || []) as POSItem[]
+                setItems(loadedItems)
                 setSummary(summaryRes)
                 setRecentInvoices(invoicesRes.invoices || [])
                 const profiles = profilesRes?.profiles || []
                 setPosProfiles(profiles)
                 setCustomers(customersRes.customers || [])
+                const warehouses = warehousesRes?.warehouses || []
+                setAvailableWarehouses(warehouses)
+                if (warehouses.length > 0 && !selectedWarehouse) {
+                    const firstWarehouse = warehouses[0]
+                    const warehouseName = firstWarehouse.name || firstWarehouse.warehouse_name
+                    const profileId = firstWarehouse.profile_id
+                    if (warehouseName) {
+                        setSelectedWarehouse(warehouseName)
+                    }
+                    if (profileId && !selectedPosProfile) {
+                        setSelectedPosProfile(profileId)
+                    }
+                }
                 // Auto-select first profile if available
                 if (profiles.length > 0 && !selectedPosProfile) {
                     setSelectedPosProfile(profiles[0].name || profiles[0].id)
+                }
+
+                // Bulk stock fetch (short-lived cached server-side)
+                try {
+                    const profileId = selectedPosProfile || (warehouses.length > 0 ? (warehouses[0]?.profile_id as string) : '') || (profiles.length > 0 ? (profiles[0].name || profiles[0].id) : '')
+                    if (profileId && loadedItems.length > 0) {
+                        const itemCodes = loadedItems.map(i => i.item_code).filter(Boolean)
+                        const stockRes = await posApi.getBulkStock(token, { pos_profile_id: profileId, item_codes: itemCodes })
+                        const qtyByItem = new Map<string, number>()
+                        for (const row of stockRes.stocks || []) {
+                            if (row?.item_code) qtyByItem.set(row.item_code, Number(row.qty) || 0)
+                        }
+                        setItems(prev => (prev || []).map(it => ({
+                            ...it,
+                            stock_qty: qtyByItem.has(it.item_code) ? qtyByItem.get(it.item_code) : (it.stock_qty ?? undefined),
+                        })))
+                    }
+                } catch (e) {
+                    // Non-fatal: grid still works, but without stock-based hiding
+                    console.warn('Failed to fetch bulk stock for POS items', e)
                 }
             } catch (error) {
                 console.error('Failed to load PoS data:', error)
@@ -190,6 +240,17 @@ export default function POSPage() {
         }
         loadData()
     }, [token, currentTenant, tenantSlug, availableTenants])
+
+    useEffect(() => {
+        if (!selectedPosProfile || availableWarehouses.length === 0) return
+        const match = availableWarehouses.find(
+            (warehouse: any) => warehouse.profile_id === selectedPosProfile
+        )
+        const warehouseName = match?.name || match?.warehouse_name
+        if (warehouseName && warehouseName !== selectedWarehouse) {
+            setSelectedWarehouse(warehouseName)
+        }
+    }, [selectedPosProfile, availableWarehouses, selectedWarehouse])
 
     // Load paint data separately when token and tenant context is available
     useEffect(() => {
@@ -216,6 +277,10 @@ export default function POSPage() {
 
     // Start session
     const startSession = (cash: number) => {
+        if (!selectedPosProfile) {
+            toast.error('Please select a warehouse before starting the session')
+            return
+        }
         const now = new Date()
         setSessionActive(true)
         setSessionStartTime(now)
@@ -226,7 +291,9 @@ export default function POSPage() {
         localStorage.setItem('pos_session', JSON.stringify({
             date: now.toISOString().split('T')[0],
             startTime: now.toISOString(),
-            openingCash: cash
+            openingCash: cash,
+            posProfileId: selectedPosProfile,
+            warehouse: selectedWarehouse
         }))
     }
 
@@ -246,18 +313,41 @@ export default function POSPage() {
         setShowSessionModal(true)
 
         // In a real app, would save session summary to backend
-        alert(`Session ended!\nExpected: KES ${expectedCash.toFixed(0)}\nActual: KES ${closingAmount.toFixed(0)}\nVariance: KES ${variance.toFixed(0)}`)
+        toast.success(
+            `Session ended! Expected: KES ${expectedCash.toFixed(0)} | Actual: KES ${closingAmount.toFixed(0)} | Variance: KES ${variance.toFixed(0)}`,
+            { duration: 5000 }
+        )
     }
 
-    // Filter items by search
-    const filteredItems = items.filter(item =>
-        item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.item_code.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    // Filter items by search + stock availability
+    // Browse (no search): show only in-stock items
+    // Search: include out-of-stock items but render as disabled
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    const filteredItems = items
+        .filter(item => {
+            if (!normalizedQuery) return true
+            return (
+                item.item_name.toLowerCase().includes(normalizedQuery) ||
+                item.item_code.toLowerCase().includes(normalizedQuery)
+            )
+        })
+        .filter(item => {
+            if (normalizedQuery) return true
+            // If stock is unknown, keep item visible to avoid hiding everything
+            if (item.stock_qty === undefined) return true
+            return item.stock_qty > 0
+        })
 
     // Cart calculations
     const cartTotal = cart.reduce((sum, item) => sum + item.total, 0)
     const cartQty = cart.reduce((sum, item) => sum + item.qty, 0)
+
+    // Backend `/api/pos/invoice` applies VAT (default 16%) on top of item amounts.
+    // Keep frontend totals aligned to avoid 400 "Payment amounts do not match grand total".
+    const VAT_RATE = 0.16
+    const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
+    const cartVat = roundMoney(cart.reduce((sum, item) => sum + item.total * VAT_RATE, 0))
+    const cartGrandTotal = roundMoney(cartTotal + cartVat)
 
     // Add to cart
     const addToCart = (item: POSItem) => {
@@ -324,7 +414,7 @@ export default function POSPage() {
                 })),
                 payments: [{
                     mode_of_payment: 'Mpesa',
-                    amount: cartTotal - loyaltyDiscount
+                    amount: cartGrandTotal
                 }]
             }
 
@@ -351,7 +441,7 @@ export default function POSPage() {
 
         // Validate POS profile is selected
         if (!selectedPosProfile) {
-            alert('Please select a POS Profile before processing sale')
+            toast.error('Please select a POS Profile before processing sale')
             return
         }
 
@@ -370,7 +460,7 @@ export default function POSPage() {
                 })),
                 payments: [{
                     mode_of_payment: selectedPayment,
-                    amount: cartTotal
+                    amount: cartGrandTotal
                 }]
             }
 
@@ -391,12 +481,13 @@ export default function POSPage() {
             // Clear cart
             clearCart()
 
-            // Show receipt preview
-            setShowReceiptPreview(true)
+            // Close confirmation modal and show success modal
+            setShowConfirmationModal(false)
+            setShowSuccessModal(true)
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to process sale:', error)
-            alert('Failed to process sale. Please try again.')
+            toast.error(error?.message || 'Failed to process sale. Please try again.')
         } finally {
             setProcessing(false)
         }
@@ -416,7 +507,7 @@ export default function POSPage() {
     // Session start modal
     if (showSessionModal && !sessionActive) {
         return (
-            <div className="h-screen flex items-center justify-center bg-[#0a0a0f]">
+            <div className="h-screen flex items-center justify-center bg-background">
                 <Card className="w-full max-w-md bg-slate-900/90 border-white/10">
                     <CardHeader className="text-center">
                         <div className="h-16 w-16 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
@@ -428,6 +519,42 @@ export default function POSPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-white/80">Warehouse</label>
+                            {availableWarehouses.length === 0 ? (
+                                <div className="text-xs text-white/50 bg-white/5 border border-white/10 rounded-md p-2">
+                                    No warehouses available for your account
+                                </div>
+                            ) : (
+                                <select
+                                    value={selectedWarehouse}
+                                    onChange={(e) => {
+                                        const value = e.target.value
+                                        setSelectedWarehouse(value)
+                                        const match = availableWarehouses.find(
+                                            (warehouse) => (warehouse.name || warehouse.warehouse_name) === value
+                                        )
+                                        setSelectedPosProfile(match?.profile_id || '')
+                                    }}
+                                    className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                                >
+                                    <option value="" className="bg-gray-900">
+                                        Select a warehouse...
+                                    </option>
+                                    {availableWarehouses.map((warehouse: any) => {
+                                        const warehouseName = warehouse.name || warehouse.warehouse_name
+                                        return (
+                                            <option key={warehouseName} value={warehouseName} className="bg-gray-900">
+                                                {warehouseName}
+                                            </option>
+                                        )
+                                    })}
+                                </select>
+                            )}
+                            {!selectedPosProfile && availableWarehouses.length > 0 && (
+                                <p className="text-xs text-red-400">Please select a warehouse</p>
+                            )}
+                        </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-white/80">Opening Cash (KES)</label>
                             <Input
@@ -441,6 +568,7 @@ export default function POSPage() {
                         <Button
                             className="w-full h-12 bg-gradient-to-r from-cyan-500 to-purple-600 text-white"
                             onClick={() => startSession(openingCash)}
+                            disabled={!selectedPosProfile}
                         >
                             Start Session
                         </Button>
@@ -451,7 +579,7 @@ export default function POSPage() {
     }
 
     return (
-        <div className="h-screen flex flex-col bg-[#0a0a0f] text-white overflow-hidden">
+        <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
             {/* Header Stats */}
             <div className="p-4 border-b border-white/10">
                 <div className="flex items-center justify-between mb-4">
@@ -511,9 +639,9 @@ export default function POSPage() {
                     </div>
                 </div>
 
-                {/* Quick Stats */}
+                {/* Quick Stats - Responsive grid */}
                 {summary && (
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                         <Card className="bg-white/5 border-white/10">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
@@ -562,10 +690,10 @@ export default function POSPage() {
                 )}
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Quick Actions Sidebar */}
-                <div className="w-80 border-r border-white/10 p-4 overflow-y-auto">
+            {/* Main Content - Stack on mobile, side-by-side on desktop */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                {/* Quick Actions Sidebar - Hidden on mobile */}
+                <div className="hidden lg:block w-80 border-r border-border p-4 overflow-y-auto">
                     <QuickActionsPanel
                         posProfileId={selectedPosProfile}
                         onItemAdd={(item) => {
@@ -591,8 +719,8 @@ export default function POSPage() {
                     />
                 </div>
 
-                {/* Products Grid */}
-                <div className="flex-1 flex flex-col p-4">
+                {/* Products Grid - Takes most space on mobile */}
+                <div className="flex-1 flex flex-col p-2 sm:p-4 min-h-[40vh] lg:min-h-0">
                     <Tabs defaultValue="products" className="flex-1 flex flex-col">
                         <TabsList className="grid w-full grid-cols-2 bg-white/5 border border-white/10">
                             <TabsTrigger value="products" className="text-white data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400">
@@ -617,23 +745,40 @@ export default function POSPage() {
                                 />
                             </div>
 
-                            {/* Items Grid */}
+                            {/* Items Grid - Responsive */}
                             <ScrollArea className="flex-1">
-                                <div className="grid grid-cols-4 gap-3">
-                                    {filteredItems.map(item => (
-                                        <button
-                                            key={item.item_code}
-                                            onClick={() => addToCart(item)}
-                                            className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/50 transition-all text-left group"
-                                        >
-                                            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center mb-3">
-                                                <Package className="h-6 w-6 text-cyan-400" />
-                                            </div>
-                                            <h3 className="font-medium text-white text-sm mb-1 truncate">{item.item_name}</h3>
-                                            <p className="text-xs text-white/40 mb-2">{item.item_code}</p>
-                                            <p className="text-lg font-bold text-cyan-400">KES {item.standard_rate}</p>
-                                        </button>
-                                    ))}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {filteredItems.map(item => {
+                                        const hasStock = item.stock_qty !== undefined
+                                        const isOutOfStock = hasStock && item.stock_qty === 0
+                                        const isLowStock = hasStock && item.stock_qty! > 0 && item.stock_qty! <= 5
+
+                                        return (
+                                            <button
+                                                key={item.item_code}
+                                                onClick={() => !isOutOfStock && addToCart(item)}
+                                                disabled={isOutOfStock}
+                                                className={`p-3 sm:p-4 rounded-xl bg-muted/50 border border-border hover:bg-muted hover:border-primary/50 transition-all text-left group relative ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {/* Stock Badge */}
+                                                {hasStock && (
+                                                    <div className={`absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded-full font-medium ${isOutOfStock ? 'bg-destructive/20 text-destructive' :
+                                                        isLowStock ? 'bg-amber-500/20 text-amber-500' :
+                                                            'bg-green-500/20 text-green-500'
+                                                        }`}>
+                                                        {isOutOfStock ? 'Out' : isLowStock ? `${item.stock_qty} left` : 'In Stock'}
+                                                    </div>
+                                                )}
+
+                                                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center mb-2 sm:mb-3">
+                                                    <Package className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                                                </div>
+                                                <h3 className="font-medium text-foreground text-xs sm:text-sm mb-1 truncate">{item.item_name}</h3>
+                                                <p className="text-xs text-muted-foreground mb-1 sm:mb-2 truncate">{item.item_code}</p>
+                                                <p className="text-base sm:text-lg font-bold text-primary">KES {item.standard_rate.toLocaleString()}</p>
+                                            </button>
+                                        )
+                                    })}
                                 </div>
                             </ScrollArea>
                         </TabsContent>
@@ -656,7 +801,7 @@ export default function POSPage() {
 
                                         {/* Dropdown for existing color codes */}
                                         {selectedColorCode && colorCodes.length > 0 && (
-                                            <div className="absolute z-50 w-full mt-1 max-h-40 overflow-auto bg-[#1a1a24] border border-white/10 rounded-lg shadow-xl">
+                                            <div className="absolute z-50 w-full mt-1 max-h-40 overflow-auto bg-popover border border-border rounded-lg shadow-xl">
                                                 <div className="p-2">
                                                     {colorCodes
                                                         .filter(color =>
@@ -722,7 +867,7 @@ export default function POSPage() {
 
                                                 // Handle different error types
                                                 if (error?.status === 401) {
-                                                    alert('Authentication required. Please refresh the page.')
+                                                    toast.error('Authentication required. Please refresh the page.')
                                                 } else if (error?.message?.includes('not found') || error?.detail?.includes('not found')) {
                                                     setPaintFormula({
                                                         color_code: selectedColorCode,
@@ -736,7 +881,7 @@ export default function POSPage() {
                                                         message: 'Color code not configured. Please inform admin to set up the formula.'
                                                     })
                                                 } else {
-                                                    alert('Failed to calculate paint formula: ' + (error?.detail || error?.message || 'Unknown error'))
+                                                    toast.error('Failed to calculate paint formula: ' + (error?.detail || error?.message || 'Unknown error'))
                                                 }
                                             }
                                         }}
@@ -840,9 +985,9 @@ export default function POSPage() {
                     </Tabs>
                 </div>
 
-                {/* Cart Panel */}
-                <div className="w-96 border-l border-white/10 flex flex-col bg-white/[0.02]">
-                    <div className="p-4 border-b border-white/10">
+                {/* Cart Panel - Full width on mobile, fixed on desktop */}
+                <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-border flex flex-col bg-muted/30 max-h-[50vh] lg:max-h-none">
+                    <div className="p-3 lg:p-4 border-b border-border">
                         <div className="flex items-center justify-between">
                             <h2 className="font-semibold text-lg flex items-center gap-2">
                                 <ShoppingCart className="h-5 w-5 text-cyan-400" />
@@ -924,7 +1069,7 @@ export default function POSPage() {
                                 <div className="mb-4">
                                     <LoyaltyPointsDisplay
                                         customer={selectedCustomer}
-                                        purchaseAmount={cartTotal - loyaltyDiscount}
+                                        purchaseAmount={cartGrandTotal}
                                         onRedeem={(points, discount) => {
                                             setLoyaltyDiscount(discount)
                                             toast.success(`Applied ${discount.toFixed(2)} KES discount`)
@@ -953,7 +1098,7 @@ export default function POSPage() {
                                             Select from existing customers...
                                         </button>
                                         {showCustomerPicker && (
-                                            <div className="absolute z-50 w-full mt-1 max-h-60 overflow-auto bg-[#1a1a24] border border-white/10 rounded-lg shadow-xl">
+                                            <div className="absolute z-50 w-full mt-1 max-h-60 overflow-auto bg-popover border border-border rounded-lg shadow-xl">
                                                 <div className="p-2">
                                                     <Input
                                                         placeholder="Search customers..."
@@ -1056,12 +1201,18 @@ export default function POSPage() {
                     <div className="p-4 border-t border-white/10 bg-white/[0.02]">
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-white/60">Total</span>
-                            <span className="text-2xl font-bold text-white">KES {cartTotal.toLocaleString()}</span>
+                            <span className="text-2xl font-bold text-white">KES {cartGrandTotal.toLocaleString()}</span>
                         </div>
                         <Button
                             className="w-full h-12 bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-semibold"
                             disabled={cart.length === 0 || processing}
-                            onClick={processSale}
+                            onClick={() => {
+                                if (!selectedPosProfile) {
+                                    toast.error('Please select a POS Profile before processing sale')
+                                    return
+                                }
+                                setShowConfirmationModal(true)
+                            }}
                         >
                             {processing ? (
                                 <>
@@ -1079,106 +1230,62 @@ export default function POSPage() {
                 </div>
             </div>
 
-            {/* Success Modal */}
-            {lastInvoice && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setLastInvoice(null)}>
-                    <div className="bg-[#0d0d14] rounded-2xl p-8 max-w-md w-full mx-4 border border-white/10" onClick={e => e.stopPropagation()}>
-                        <div className="text-center">
-                            <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                                <Check className="h-8 w-8 text-emerald-400" />
-                            </div>
-                            <h2 className="text-xl font-bold text-white mb-2">Sale Complete!</h2>
-                            <p className="text-white/60 mb-6">Invoice {lastInvoice.name}</p>
+            {/* Sale Confirmation Modal */}
+            <SaleConfirmationModal
+                open={showConfirmationModal}
+                onClose={() => setShowConfirmationModal(false)}
+                onConfirm={processSale}
+                cart={cart}
+                customer={selectedCustomer}
+                customerType={customerType}
+                paymentMethod={selectedPayment}
+                subtotal={cartTotal}
+                discount={0}
+                total={cartGrandTotal}
+                isProcessing={processing}
+            />
 
-                            <div className="bg-white/5 rounded-xl p-4 mb-6 text-left">
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-white/60">Total</span>
-                                    <span className="font-bold text-white">KES {lastInvoice.grand_total.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-white/60">Items</span>
-                                    <span className="text-white">{lastInvoice.total_qty}</span>
-                                </div>
-                                <div className="flex justify-between mb-2">
-                                    <span className="text-white/60">Payment</span>
-                                    <span className="text-white">{lastInvoice.payments[0]?.mode_of_payment}</span>
-                                </div>
-                                {lastInvoice.commission_amount > 0 && (
-                                    <div className="flex justify-between pt-2 border-t border-white/10">
-                                        <span className="text-white/60">Commission ({lastInvoice.commission_rate}%)</span>
-                                        <span className="text-purple-400 font-medium">KES {lastInvoice.commission_amount.toLocaleString()}</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            <Button onClick={() => setLastInvoice(null)} className="w-full bg-cyan-500 hover:bg-cyan-600">
-                                New Sale
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Sale Success Modal */}
+            <SaleSuccessModal
+                open={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
+                onNewSale={() => {
+                    setShowSuccessModal(false)
+                    setLastInvoice(null)
+                }}
+                invoiceId={lastInvoiceId}
+                invoiceNumber={lastInvoice?.name || ''}
+                total={lastInvoice?.grand_total || 0}
+                customer={lastInvoice?.customer || selectedCustomer || 'Walk-in Customer'}
+                token={token || ''}
+            />
 
             {/* End Session Modal */}
-            {showEndSessionModal && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-                    <div className="bg-[#0d0d14] rounded-2xl p-8 max-w-md w-full mx-4 border border-white/10">
-                        <div className="text-center">
-                            <div className="h-16 w-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
-                                <Receipt className="h-8 w-8 text-orange-400" />
-                            </div>
-                            <h2 className="text-xl font-bold text-white mb-2">End Session</h2>
-                            <p className="text-white/60 mb-6">Balance your cash and close the session</p>
+            <EndSessionModal
+                open={showEndSessionModal}
+                onClose={() => setShowEndSessionModal(false)}
+                onConfirm={(closingAmount) => {
+                    const expectedCash = openingCash + (summary?.by_payment_mode?.cash || 0)
+                    const variance = closingAmount - expectedCash
 
-                            <div className="bg-white/5 rounded-xl p-4 mb-6 text-left space-y-3">
-                                <div className="flex justify-between">
-                                    <span className="text-white/60">Opening Cash</span>
-                                    <span className="text-white">KES {openingCash.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-white/60">Cash Sales</span>
-                                    <span className="text-emerald-400">+ KES {(summary?.by_payment_mode?.cash || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-white/60">M-Pesa</span>
-                                    <span className="text-white/50">KES {(summary?.by_payment_mode?.mpesa || 0).toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between pt-2 border-t border-white/10">
-                                    <span className="text-white font-medium">Expected Cash</span>
-                                    <span className="text-cyan-400 font-bold">KES {(openingCash + (summary?.by_payment_mode?.cash || 0)).toLocaleString()}</span>
-                                </div>
-                            </div>
+                    // Clear session
+                    localStorage.removeItem('pos_session')
+                    setSessionActive(false)
+                    setSessionStartTime(null)
+                    setOpeningCash(0)
+                    setShowEndSessionModal(false)
+                    setClosingCash('')
+                    setShowSessionModal(true)
 
-                            <div className="mb-6">
-                                <label className="text-sm font-medium text-white/80 block text-left mb-2">Actual Cash Count (KES)</label>
-                                <Input
-                                    type="number"
-                                    placeholder="Enter your cash count"
-                                    className="bg-white/10 border-white/20 text-white text-lg h-12"
-                                    value={closingCash}
-                                    onChange={(e) => setClosingCash(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="flex gap-3">
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 border-white/20 text-white hover:bg-white/10"
-                                    onClick={() => setShowEndSessionModal(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500"
-                                    onClick={endSession}
-                                >
-                                    End Session
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    toast.success(
+                        `Session ended! Expected: KES ${expectedCash.toFixed(0)} | Actual: KES ${closingAmount.toFixed(0)} | Variance: KES ${variance.toFixed(0)}`,
+                        { duration: 5000 }
+                    )
+                }}
+                sessionStartTime={sessionStartTime}
+                openingCash={openingCash}
+                summary={summary}
+            />
 
             {/* Receipt Preview Modal */}
             <ReceiptPreview

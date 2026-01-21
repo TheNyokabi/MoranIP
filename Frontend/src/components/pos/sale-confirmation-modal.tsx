@@ -1,0 +1,190 @@
+'use client';
+
+import * as React from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+    ShoppingCart,
+    User,
+    CreditCard,
+    Receipt,
+    Loader2,
+    CheckCircle2,
+    Tag
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface CartItem {
+    item_code: string;
+    item_name: string;
+    qty: number;
+    rate: number;
+    total: number;
+}
+
+interface SaleConfirmationModalProps {
+    open: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    cart: CartItem[];
+    customer: string;
+    customerType: string;
+    paymentMethod: string;
+    subtotal: number;
+    discount: number;
+    total: number;
+    isProcessing: boolean;
+}
+
+const PAYMENT_ICONS: Record<string, React.ReactNode> = {
+    Cash: <CreditCard className="h-4 w-4" />,
+    Mpesa: <span className="text-xs font-bold">M</span>,
+    Pesalink: <span className="text-xs font-bold">PL</span>,
+};
+
+export function SaleConfirmationModal({
+    open,
+    onClose,
+    onConfirm,
+    cart,
+    customer,
+    customerType,
+    paymentMethod,
+    subtotal,
+    discount,
+    total,
+    isProcessing,
+}: SaleConfirmationModalProps) {
+    return (
+        <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <ShoppingCart className="h-5 w-5 text-primary" />
+                        Confirm Sale
+                    </DialogTitle>
+                    <DialogDescription>
+                        Review your order before completing the sale
+                    </DialogDescription>
+                </DialogHeader>
+
+                <ScrollArea className="flex-1 max-h-[300px] pr-4">
+                    {/* Order Items */}
+                    <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-muted-foreground">Order Items</h4>
+                        {cart.map((item, index) => (
+                            <div
+                                key={item.item_code}
+                                className={cn(
+                                    "flex items-center justify-between py-2",
+                                    index < cart.length - 1 && "border-b border-border"
+                                )}
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{item.item_name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {item.qty} × KES {item.rate.toLocaleString()}
+                                    </p>
+                                </div>
+                                <p className="font-medium ml-4">
+                                    KES {item.total.toLocaleString()}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+
+                <Separator className="my-4" />
+
+                {/* Customer & Payment Info */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                            <p className="text-xs text-muted-foreground">Customer</p>
+                            <p className="text-sm font-medium">{customer || 'Walk-in Customer'}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                            {customerType}
+                        </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                            <p className="text-xs text-muted-foreground">Payment Method</p>
+                            <p className="text-sm font-medium flex items-center gap-1">
+                                {PAYMENT_ICONS[paymentMethod]}
+                                {paymentMethod}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                {/* Totals */}
+                <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>KES {subtotal.toLocaleString()}</span>
+                    </div>
+                    {discount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                            <span className="flex items-center gap-1">
+                                <Tag className="h-3 w-3" />
+                                Loyalty Discount
+                            </span>
+                            <span>- KES {discount.toLocaleString()}</span>
+                        </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between text-lg font-bold">
+                        <span>Total</span>
+                        <span className="text-primary">KES {total.toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <DialogFooter className="mt-4 gap-2 sm:gap-0">
+                    <Button
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={isProcessing}
+                    >
+                        Back
+                    </Button>
+                    <Button
+                        onClick={onConfirm}
+                        disabled={isProcessing}
+                        className="min-w-[140px]"
+                    >
+                        {isProcessing ? (
+                            <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Processing...
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Complete Sale
+                            </>
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default SaleConfirmationModal;

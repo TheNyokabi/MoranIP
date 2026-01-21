@@ -82,10 +82,15 @@ export default function InventoryPage() {
     const [stockLevels, setStockLevels] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [stockAccountSuggestion, setStockAccountSuggestion] = useState<string | null>(null);
+
+    const isGroupWarehouse = (warehouse: POSWarehouse) => warehouse?.is_group === 1 || warehouse?.is_group === true;
+    const transactionWarehouses = warehouses.filter((warehouse) => !isGroupWarehouse(warehouse));
+    const selectableWarehouses = transactionWarehouses.length ? transactionWarehouses : warehouses;
     const [warehouseTypes, setWarehouseTypes] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+    const [runningPreflight, setRunningPreflight] = useState(false);
 
     // Edit/Create State
     const [isEditing, setIsEditing] = useState(false);
@@ -98,10 +103,12 @@ export default function InventoryPage() {
     const [isCreatingStockEntry, setIsCreatingStockEntry] = useState(false);
     const [stockEntry, setStockEntry] = useState<{
         type: 'Material Receipt' | 'Material Issue' | 'Material Transfer';
-        items: Array<{ item_code: string; qty: number; warehouse: string }>;
+        transfer_target_warehouse: string;
+        items: Array<{ item_code: string; qty: number; warehouse: string; basic_rate?: number }>;
     }>({
         type: 'Material Receipt',
-        items: [{ item_code: '', qty: 0, warehouse: '' }]
+        transfer_target_warehouse: '',
+        items: [{ item_code: '', qty: 0, warehouse: '', basic_rate: 0 }]
     });
 
     useEffect(() => {
@@ -113,7 +120,7 @@ export default function InventoryPage() {
             fetchData();
         }
     }, [token, mounted]);
-    
+
     useEffect(() => {
         if (!token) return;
         let isMounted = true;
@@ -212,6 +219,36 @@ export default function InventoryPage() {
             toast.error("Failed to load inventory");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const runAccountingPreflight = async () => {
+        if (!token) return;
+        setRunningPreflight(true);
+        try {
+            const result = await apiFetch<any>("/api/inventory/accounting-preflight", {}, token);
+            const missingWarehouseAccounts = result?.warehouses?.missing_inventory_account?.length || 0;
+            const hasStockAsset = !!result?.accounts?.stock_asset_account;
+            const company = result?.company?.name || "(unknown company)";
+
+            if (!result?.company?.exists) {
+                toast.error(`Accounting preflight failed: company not found (${company})`);
+                return;
+            }
+
+            if (!hasStockAsset || missingWarehouseAccounts > 0) {
+                toast.warning(
+                    `Accounting preflight warnings for ${company}: ` +
+                    `${hasStockAsset ? "" : "missing Stock Asset account; "}` +
+                    `${missingWarehouseAccounts > 0 ? `${missingWarehouseAccounts} warehouses missing inventory account` : ""}`.trim()
+                );
+            } else {
+                toast.success(`Accounting preflight OK for ${company}`);
+            }
+        } catch (e: any) {
+            toast.error(e?.message || "Failed to run accounting preflight");
+        } finally {
+            setRunningPreflight(false);
         }
     };
 
@@ -337,9 +374,11 @@ export default function InventoryPage() {
 
     // Stock Entry
     const handleCreateStockEntry = () => {
+        const defaultWarehouse = selectableWarehouses[0]?.name || '';
         setStockEntry({
             type: 'Material Receipt',
-            items: [{ item_code: items[0]?.item_code || '', qty: 0, warehouse: warehouses[0]?.name || '' }]
+            transfer_target_warehouse: '',
+            items: [{ item_code: '', qty: 1, warehouse: defaultWarehouse, basic_rate: 0 }]
         });
         setIsCreatingStockEntry(true);
     };
@@ -362,38 +401,138 @@ export default function InventoryPage() {
     };
 
     const handleAddStockEntryItem = () => {
+        const defaultWarehouse = selectableWarehouses[0]?.name || '';
         setStockEntry(prev => ({
             ...prev,
-            items: [...prev.items, { item_code: '', qty: 0, warehouse: warehouses[0]?.name || '' }]
+            items: [...prev.items, { item_code: '', qty: 0, warehouse: defaultWarehouse, basic_rate: 0 }]
         }));
     };
 
     const handleSaveStockEntry = async () => {
         if (!token) return;
 
+        // Validate all items have required fields
+        const invalidItems = stockEntry.items.filter(item =>
+            !item.item_code || item.qty <= 0 || !item.warehouse
+        );
+
+        if (invalidItems.length > 0) {
+            toast.error("Please select an item, enter a quantity > 0, and select a warehouse for all items");
+            return;
+        }
+
+        if (stockEntry.type === 'Material Receipt') {
+            const invalidRates = stockEntry.items.filter(item => !item.basic_rate || item.basic_rate <= 0);
+            if (invalidRates.length > 0) {
+                toast.error('Please enter a Basic Rate > 0 for all receipt items');
+                return;
+            }
+        }
+
+        if (stockEntry.type === 'Material Transfer' && !stockEntry.transfer_target_warehouse) {
+            toast.error('Please select a target warehouse for the transfer');
+            return;
+        }
+
+        const hasGroupWarehouse = stockEntry.items.some(item => {
+            const match = warehouses.find(wh => wh.name === item.warehouse || wh.warehouse_name === item.warehouse);
+            return match ? isGroupWarehouse(match) : false;
+        });
+        const transferTargetIsGroup = stockEntry.type === 'Material Transfer'
+            ? (() => {
+                const match = warehouses.find(wh => wh.name === stockEntry.transfer_target_warehouse || wh.warehouse_name === stockEntry.transfer_target_warehouse);
+                return match ? isGroupWarehouse(match) : false;
+            })()
+            : false;
+
+        if (hasGroupWarehouse || transferTargetIsGroup) {
+            toast.error('Please select a non-group (transaction) warehouse');
+            return;
+        }
+
         setSaving(true);
         try {
-            const entryData = {
+            // Build items based on stock entry type:
+            // - Material Receipt: Receiving INTO warehouse (t_warehouse only)
+            // - Material Issue: Taking FROM warehouse (s_warehouse only)
+            // - Material Transfer: Moving BETWEEN warehouses (both s_warehouse and t_warehouse)
+            const sourceWarehouses = new Set(stockEntry.items.map(i => i.warehouse).filter(Boolean));
+
+            const entryData: any = {
                 stock_entry_type: stockEntry.type,
-                items: stockEntry.items.map(item => ({
-                    item_code: item.item_code,
-                    qty: item.qty,
-                    t_warehouse: item.warehouse
-                })),
-                docstatus: 0 // Draft
+                items: stockEntry.items.map(item => {
+                    const baseItem: any = {
+                        item_code: item.item_code,
+                        qty: item.qty,
+                    };
+
+                    if (stockEntry.type === 'Material Receipt') {
+                        baseItem.basic_rate = item.basic_rate;
+                    }
+
+                    if (stockEntry.type === 'Material Receipt') {
+                        // Receiving INTO inventory - only target warehouse needed
+                        baseItem.t_warehouse = item.warehouse;
+                    } else if (stockEntry.type === 'Material Issue') {
+                        // Issuing FROM inventory - only source warehouse needed
+                        baseItem.s_warehouse = item.warehouse;
+                    } else if (stockEntry.type === 'Material Transfer') {
+                        // Transferring - source warehouse required, target is where we move TO
+                        baseItem.s_warehouse = item.warehouse;
+                        baseItem.t_warehouse = stockEntry.transfer_target_warehouse;
+                    }
+
+                    return baseItem;
+                }),
             };
 
-            const result = await erpNextApi.createResource(token, "Stock Entry", entryData);
+            // Populate optional parent-level warehouses when unambiguous.
+            if (stockEntry.type === 'Material Receipt' && sourceWarehouses.size === 1) {
+                entryData.to_warehouse = Array.from(sourceWarehouses)[0];
+            }
+            if (stockEntry.type === 'Material Issue' && sourceWarehouses.size === 1) {
+                entryData.from_warehouse = Array.from(sourceWarehouses)[0];
+            }
+            if (stockEntry.type === 'Material Transfer') {
+                entryData.to_warehouse = stockEntry.transfer_target_warehouse;
+                if (sourceWarehouses.size === 1) {
+                    entryData.from_warehouse = Array.from(sourceWarehouses)[0];
+                }
+            }
+
+            // Create draft via backend inventory API (enforces ERPNext warehouse requirements)
+            const created = await apiFetch<{ data: { name: string } }>(
+                `/api/inventory/stock-entries`,
+                { method: 'POST', body: JSON.stringify(entryData) },
+                token
+            );
 
             // Submit the entry to update stock levels
-            await erpNextApi.updateResource(token, "Stock Entry", result.name, { docstatus: 1 });
+            await apiFetch(`/api/inventory/stock-entries/${encodeURIComponent(created.data.name)}/submit`, {
+                method: 'POST'
+            }, token);
+
+            // Optional: verify posting artifacts (GL + Stock Ledger) exist in ERPNext
+            try {
+                const posting = await apiFetch<{ gl_entries: any[]; stock_ledger_entries: any[] }>(
+                    `/api/inventory/stock-entries/${encodeURIComponent(created.data.name)}/posting`,
+                    { method: 'GET' },
+                    token
+                );
+                const glCount = posting?.gl_entries?.length ?? 0;
+                const sleCount = posting?.stock_ledger_entries?.length ?? 0;
+                toast.success(`Posted to ledgers (GL ${glCount}, SLE ${sleCount})`);
+            } catch (e) {
+                // Non-blocking: submission already succeeded
+                toast.message('Submitted, but could not verify ledger posting');
+            }
 
             toast.success("Stock entry created and submitted");
             setIsCreatingStockEntry(false);
             fetchData();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to create stock entry", error);
-            toast.error("Failed to create stock entry");
+            toast.error(error?.message || "Failed to create stock entry");
         } finally {
             setSaving(false);
         }
@@ -448,6 +587,16 @@ export default function InventoryPage() {
                     </div>
                     <div className="flex items-center gap-3">
                         <BulkUploadModal entityType="inventory" onSuccess={fetchData} />
+                        <Button
+                            variant="outline"
+                            onClick={runAccountingPreflight}
+                            disabled={runningPreflight}
+                            className="border-border hover:bg-muted text-foreground"
+                            data-testid="inventory-run-accounting-preflight"
+                        >
+                            {runningPreflight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Accounting Check
+                        </Button>
                         <Button
                             variant="outline"
                             onClick={handleCreateStockEntry}
@@ -1300,6 +1449,24 @@ export default function InventoryPage() {
                                 </select>
                             </div>
 
+                            {stockEntry.type === 'Material Transfer' && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">Target Warehouse</label>
+                                    <select
+                                        value={stockEntry.transfer_target_warehouse}
+                                        onChange={e => setStockEntry(prev => ({ ...prev, transfer_target_warehouse: e.target.value }))}
+                                        className="w-full h-10 px-3 rounded-md border border-border bg-background text-foreground text-sm"
+                                        data-testid="inventory-stock-entry-transfer-target"
+                                    >
+                                        <option value="">Select target warehouse</option>
+                                        {selectableWarehouses.map(wh => (
+                                            <option key={wh.name} value={wh.name} className="bg-gray-900">{wh.name}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-muted-foreground">Stock will be moved into this warehouse.</p>
+                                </div>
+                            )}
+
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <label className="text-sm font-medium text-foreground">Items</label>
@@ -1317,7 +1484,7 @@ export default function InventoryPage() {
                                 {stockEntry.items.map((item, idx) => (
                                     <div
                                         key={idx}
-                                        className="grid grid-cols-3 gap-2 p-3 bg-card dark:bg-white/5 rounded-lg border border-border dark:border-white/5"
+                                        className={`grid ${stockEntry.type === 'Material Receipt' ? 'grid-cols-4' : 'grid-cols-3'} gap-2 p-3 bg-card dark:bg-white/5 rounded-lg border border-border dark:border-white/5`}
                                         data-testid={`inventory-stock-entry-line-${idx}`}
                                     >
                                         <div className="space-y-1">
@@ -1352,8 +1519,30 @@ export default function InventoryPage() {
                                                 data-testid={`inventory-stock-entry-qty-${idx}`}
                                             />
                                         </div>
+
+                                        {stockEntry.type === 'Material Receipt' && (
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground">Basic Rate</label>
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    className="h-8 bg-background dark:bg-black/20 border-border text-foreground"
+                                                    value={item.basic_rate ?? 0}
+                                                    onChange={e => {
+                                                        const newItems = [...stockEntry.items];
+                                                        newItems[idx].basic_rate = Number(e.target.value) || 0;
+                                                        setStockEntry(prev => ({ ...prev, items: newItems }));
+                                                    }}
+                                                    data-testid={`inventory-stock-entry-basic-rate-${idx}`}
+                                                />
+                                            </div>
+                                        )}
                                         <div className="space-y-1">
-                                            <label className="text-xs text-muted-foreground">Warehouse</label>
+                                            <label className="text-xs text-muted-foreground">
+                                                {stockEntry.type === 'Material Receipt' ? 'Target Warehouse' :
+                                                    stockEntry.type === 'Material Issue' ? 'Source Warehouse' :
+                                                        'Source Warehouse'}
+                                            </label>
                                             <select
                                                 value={item.warehouse}
                                                 onChange={e => {
@@ -1364,7 +1553,8 @@ export default function InventoryPage() {
                                                 className="w-full h-8 px-2 rounded-md border border-border bg-background dark:bg-black/20 text-foreground text-sm"
                                                 data-testid={`inventory-stock-entry-warehouse-${idx}`}
                                             >
-                                                {warehouses.map(wh => (
+                                                <option value="">Select warehouse</option>
+                                                {selectableWarehouses.map(wh => (
                                                     <option key={wh.name} value={wh.name} className="bg-gray-900">{wh.name}</option>
                                                 ))}
                                             </select>

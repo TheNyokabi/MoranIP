@@ -98,7 +98,7 @@ robot --outputdir results --include critical tests/
 
 ### Update Test Variables
 Edit test files to update:
-- `${FRONTEND_URL}` - Frontend URL (default: http://localhost:3000)
+- `${FRONTEND_URL}` - Frontend URL (default: http://localhost:4000)
 - `${EMAIL}` - Test user email
 - `${PASSWORD}` - Test user password
 

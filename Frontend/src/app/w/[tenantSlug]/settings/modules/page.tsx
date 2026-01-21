@@ -23,10 +23,17 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export default function ERPModulesPage({ params }: { params: { tenantSlug: string } }) {
-    const { currentTenant } = useTenantStore();
+    const { currentTenant, selectTenantBySlug } = useTenantStore();
     const { modules, isLoading, fetchModules, enableModule, disableModule, configureModule, setupERP } = useERPStore();
     const [isSettingUp, setIsSettingUp] = useState(false);
     const [togglingModule, setTogglingModule] = useState<string | null>(null);
+
+    // Ensure tenant is selected from URL slug
+    useEffect(() => {
+        if (!currentTenant && params.tenantSlug) {
+            selectTenantBySlug(params.tenantSlug);
+        }
+    }, [currentTenant, params.tenantSlug, selectTenantBySlug]);
 
     useEffect(() => {
         if (currentTenant?.id) {
@@ -80,7 +87,13 @@ export default function ERPModulesPage({ params }: { params: { tenantSlug: strin
         }
     };
 
-    if (!currentTenant) return null;
+    if (!currentTenant) {
+        return (
+            <div className="flex items-center justify-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
     if (isLoading && modules.length === 0) {
         return (
@@ -150,7 +163,7 @@ export default function ERPModulesPage({ params }: { params: { tenantSlug: strin
                                                 <Badge variant="secondary" className="text-xs">
                                                     Active
                                                 </Badge>
-                                                <ModuleConfig 
+                                                <ModuleConfig
                                                     module={module}
                                                     onSave={(config) => handleConfigureModule(module.code, config)}
                                                 />

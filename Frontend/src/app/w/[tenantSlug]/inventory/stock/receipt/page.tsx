@@ -25,7 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { createStockEntry } from '@/lib/api/inventory';
+import { createStockEntry, submitStockEntry, getStockEntryPosting } from '@/lib/api/inventory';
 import { getItems, getWarehouses } from '@/lib/api/inventory';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 const stockEntryItemSchema = z.object({
     item_code: z.string().min(1, 'Item is required'),
     qty: z.number().min(0.01, 'Quantity must be greater than 0'),
+    basic_rate: z.number().min(0.01, 'Basic Rate must be greater than 0'),
     uom: z.string().optional(),
 });
 
@@ -66,7 +67,7 @@ export default function MaterialReceiptPage() {
         defaultValues: {
             to_warehouse: '',
             posting_date: new Date().toISOString().split('T')[0],
-            items: [{ item_code: '', qty: 1 }],
+            items: [{ item_code: '', qty: 1, basic_rate: 0 }],
         },
     });
 
@@ -76,11 +77,26 @@ export default function MaterialReceiptPage() {
     });
 
     const createMutation = useMutation({
-        mutationFn: (data: any) => createStockEntry(data),
-        onSuccess: () => {
+        mutationFn: async (data: any) => {
+            const created = await createStockEntry(data);
+            await submitStockEntry(created.name);
+            return created;
+        },
+        onSuccess: async (created) => {
+            try {
+                const posting = await getStockEntryPosting(created.name, 50);
+                const glCount = posting?.gl_entries?.length ?? 0;
+                const sleCount = posting?.stock_ledger_entries?.length ?? 0;
+                toast({
+                    title: 'Posted',
+                    description: `Material receipt submitted (GL ${glCount}, SLE ${sleCount}).`,
+                });
+            } catch {
+                // Non-blocking: submission already succeeded
+            }
             toast({
                 title: 'Success',
-                description: 'Material receipt created successfully.',
+                description: 'Material receipt created and submitted successfully.',
             });
             router.push(`/w/${tenantSlug}/inventory/stock/entries`);
         },
@@ -101,6 +117,7 @@ export default function MaterialReceiptPage() {
             items: data.items.map(item => ({
                 item_code: item.item_code,
                 qty: item.qty,
+                basic_rate: item.basic_rate,
                 t_warehouse: data.to_warehouse,
             })),
         };
@@ -248,6 +265,30 @@ export default function MaterialReceiptPage() {
                                                             type="number"
                                                             step="0.01"
                                                             placeholder="Qty"
+                                                            value={field.value}
+                                                            onChange={(e) => {
+                                                                field.onChange(e.target.value === '' ? 0 : Number(e.target.value));
+                                                            }}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={form.control}
+                                            name={`items.${index}.basic_rate`}
+                                            render={({ field }) => (
+                                                <FormItem className="w-40">
+                                                    <FormLabel className={index > 0 ? 'sr-only' : ''}>
+                                                        Basic Rate
+                                                    </FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            placeholder="Basic Rate"
                                                             value={field.value}
                                                             onChange={(e) => {
                                                                 field.onChange(e.target.value === '' ? 0 : Number(e.target.value));

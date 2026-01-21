@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Request, status
+import json
 from app.services.erpnext_client import erpnext_adapter
 from app.dependencies.auth import get_current_token_payload, require_tenant_access
 from app.middleware.response_normalizer import ResponseNormalizer
@@ -32,7 +33,24 @@ def list_gl_entries(
     Query parameters: filters, fields, limit_page_length
     """
     check_permission(payload, "view", "GL Entry")
-    return erpnext_adapter.list_resource("GL Entry", tenant_id)
+    params = dict(request.query_params)
+    voucher_no = params.pop("voucher_no", None)
+    voucher_type = params.pop("voucher_type", None)
+    if "filters" not in params and voucher_no:
+        filters = [["voucher_no", "=", voucher_no]]
+        if voucher_type:
+            filters.append(["voucher_type", "=", voucher_type])
+        params["filters"] = json.dumps(filters)
+    if "fields" not in params:
+        params["fields"] = '["name","account","debit","credit","voucher_no","voucher_type","posting_date"]'
+    if "limit_page_length" not in params:
+        params["limit_page_length"] = 200
+    return erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/GL Entry",
+        method="GET",
+        params=params
+    )
 
 
 @router.post("/gl-entries", status_code=status.HTTP_201_CREATED)

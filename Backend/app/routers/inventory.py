@@ -17,6 +17,7 @@ from app.dependencies.auth import get_current_user, require_tenant_access
 from app.database import get_db
 from app.models.iam import Tenant, TenantSettings
 from app.middleware.response_normalizer import ResponseNormalizer
+from app.services.pos.inventory_integration import InventoryIntegrationService
 
 router = APIRouter(
     prefix="/inventory",
@@ -78,7 +79,7 @@ class StockEntryItem(BaseModel):
 
 class StockEntryCreate(BaseModel):
     stock_entry_type: str  # Material Receipt, Material Issue, Material Transfer
-    company: str = "Paint Shop Ltd"
+    company: Optional[str] = None
     posting_date: Optional[str] = None
     items: List[StockEntryItem]
     from_warehouse: Optional[str] = None
@@ -97,6 +98,11 @@ class StockReconciliationCreate(BaseModel):
     posting_date: Optional[str] = None
     purpose: str = "Stock Reconciliation"
     items: List[StockReconciliationItem]
+
+
+class WarehouseAccountFixRequest(BaseModel):
+    warehouses: Optional[List[str]] = None
+    dry_run: bool = True
 
 
 # ==================== Item Endpoints ====================
@@ -196,7 +202,7 @@ async def delete_item(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete an item (mark as disabled)."""
-    result = erpnext_adapter.proxy_request(
+    erpnext_adapter.proxy_request(
         tenant_id=tenant_id,
         path=f"resource/Item/{item_code}",
         method="PUT",
@@ -219,7 +225,10 @@ async def list_warehouses(
     """List all warehouses with optional filters."""
     import json
     
-    params = {"limit_page_length": 200}
+    params = {
+        "limit_page_length": 200,
+        "fields": '["name","warehouse_name","is_group","company","disabled","warehouse_type","parent_warehouse"]'
+    }
     
     # Resolve company from tenant context to avoid cross-tenant leakage
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
@@ -564,6 +573,290 @@ async def list_warehouse_types(
     return {"warehouse_types": type_names}
 
 
+@router.get("/accounting-preflight")
+async def accounting_preflight(
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Preflight checks to align API Stock Entry behavior with ERPNext accounting expectations.
+
+    Focus areas:
+    - Company resolution and existence (prevents InvalidWarehouseCompany)
+    - Stock Asset account availability (inventory asset)
+    - Warehouse inventory account coverage for non-group warehouses
+    """
+    import json
+    from urllib.parse import quote
+
+    # Resolve company from tenant settings, falling back to tenant name, then single ERPNext company.
+    resolved_from = None
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    company_name = None
+    if tenant and tenant.tenant_settings and tenant.tenant_settings.company_name:
+        company_name = tenant.tenant_settings.company_name
+        resolved_from = "tenant_settings.company_name"
+    elif tenant and tenant.name:
+        company_name = tenant.name
+        resolved_from = "tenant.name"
+
+    companies_hint = None
+    if not company_name:
+        try:
+            companies_response = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Company",
+                method="GET",
+                params={"limit_page_length": 10},
+            )
+            companies = companies_response.get("data", []) if isinstance(companies_response, dict) else []
+            companies_hint = [c.get("name") for c in companies if isinstance(c, dict) and c.get("name")]
+            if len(companies) == 1:
+                company_name = companies[0].get("name")
+                resolved_from = "erpnext.single_company"
+        except Exception:
+            companies_hint = None
+
+    company_exists = False
+    company_doc = None
+    if company_name:
+        try:
+            company_doc = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path=f"resource/Company/{quote(company_name)}",
+                method="GET",
+            )
+            company_data = company_doc.get("data") if isinstance(company_doc, dict) and "data" in company_doc else company_doc
+            if isinstance(company_data, dict) and company_data.get("name"):
+                company_exists = True
+                company_doc = company_data
+        except Exception:
+            company_exists = False
+
+    # Stock asset account suggestion (same strategy as /stock-asset-account)
+    stock_asset_account = None
+    if company_name:
+        account_filters = [
+            f'[["company", "=", "{company_name}"], ["account_type", "=", "Stock"], ["is_group", "=", 0]]',
+            f'[["company", "=", "{company_name}"], ["account_name", "like", "%Stock In Hand%"], ["is_group", "=", 0]]',
+            f'[["company", "=", "{company_name}"], ["account_name", "like", "%Inventory%"], ["is_group", "=", 0]]',
+        ]
+        for account_filter in account_filters:
+            try:
+                resp = erpnext_adapter.proxy_request(
+                    tenant_id=tenant_id,
+                    path="resource/Account",
+                    method="GET",
+                    params={
+                        "filters": account_filter,
+                        "limit_page_length": 1,
+                        "fields": '["name","account_name","account_type"]',
+                    },
+                )
+                data = resp.get("data", []) if isinstance(resp, dict) else []
+                if data:
+                    stock_asset_account = data[0].get("name")
+                    break
+            except Exception:
+                continue
+
+    # Warehouses: ensure non-group warehouses have an inventory account when perpetual inventory is in effect.
+    missing_warehouse_accounts = []
+    warehouses_checked = 0
+    if company_name:
+        try:
+            resp = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Warehouse",
+                method="GET",
+                params={
+                    "limit_page_length": 200,
+                    "fields": '["name","is_group","account","company","disabled"]',
+                    "filters": json.dumps([["company", "=", company_name], ["disabled", "=", 0]]),
+                },
+            )
+            warehouses = resp.get("data", []) if isinstance(resp, dict) else []
+            for w in warehouses:
+                if not isinstance(w, dict):
+                    continue
+                warehouses_checked += 1
+                if int(w.get("is_group") or 0) == 0:
+                    if not (w.get("account") or "").strip():
+                        missing_warehouse_accounts.append(w.get("name"))
+        except Exception:
+            warehouses_checked = 0
+
+    recommendations = []
+    if not company_name:
+        recommendations.append(
+            "Set tenant_settings.company_name (recommended) or ensure ERPNext has exactly one Company."
+        )
+    elif not company_exists:
+        recommendations.append(
+            "Ensure the resolved company exists in ERPNext and matches your warehouses."
+        )
+    if company_exists and not stock_asset_account:
+        recommendations.append(
+            "Create/verify a Stock/Inventory (Asset) account in Chart of Accounts for this company."
+        )
+    if missing_warehouse_accounts:
+        recommendations.append(
+            "Set an inventory account on each non-group Warehouse (or configure defaults so ERPNext can resolve inventory accounts)."
+        )
+
+    return {
+        "company": {
+            "name": company_name,
+            "resolved_from": resolved_from,
+            "exists": company_exists,
+            "companies_hint": companies_hint,
+        },
+        "accounts": {
+            "stock_asset_account": stock_asset_account,
+            "company_defaults": {
+                # ERPNext field names vary by version/config; include what we can see.
+                "default_inventory_account": company_doc.get("default_inventory_account") if isinstance(company_doc, dict) else None,
+                "stock_adjustment_account": company_doc.get("stock_adjustment_account") if isinstance(company_doc, dict) else None,
+            },
+        },
+        "warehouses": {
+            "checked": warehouses_checked,
+            "missing_inventory_account": missing_warehouse_accounts,
+        },
+        "notes": {
+            "basic_rate_required_for_material_receipt": True,
+            "stock_entry_is_not_purchase_invoice": True,
+        },
+        "recommendations": recommendations,
+    }
+
+
+@router.post("/accounting/fix-warehouse-accounts")
+async def fix_warehouse_inventory_accounts(
+    req: WarehouseAccountFixRequest,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Apply a Stock Asset (inventory) account to warehouses missing one.
+
+    This is intended to resolve common ERPNext accounting misconfiguration where non-group
+    warehouses have no inventory account set.
+    """
+    import json
+    from urllib.parse import quote
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    company_name = None
+    if tenant and tenant.tenant_settings and tenant.tenant_settings.company_name:
+        company_name = tenant.tenant_settings.company_name
+    elif tenant and tenant.name:
+        company_name = tenant.name
+
+    if not company_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Unable to resolve company for this tenant.",
+                "tenant_id": tenant_id,
+            },
+        )
+
+    # Resolve stock asset account to apply.
+    stock_asset_account = None
+    account_filters = [
+        f'[["company", "=", "{company_name}"], ["account_type", "=", "Stock"], ["is_group", "=", 0]]',
+        f'[["company", "=", "{company_name}"], ["account_name", "like", "%Stock In Hand%"], ["is_group", "=", 0]]',
+        f'[["company", "=", "{company_name}"], ["account_name", "like", "%Inventory%"], ["is_group", "=", 0]]',
+    ]
+    for account_filter in account_filters:
+        try:
+            resp = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Account",
+                method="GET",
+                params={
+                    "filters": account_filter,
+                    "limit_page_length": 1,
+                    "fields": '["name","account_name","account_type"]',
+                },
+            )
+            data = resp.get("data", []) if isinstance(resp, dict) else []
+            if data:
+                stock_asset_account = data[0].get("name")
+                break
+        except Exception:
+            continue
+
+    if not stock_asset_account:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "stock_account_missing",
+                "message": "Stock Asset account not found for this company.",
+                "company": company_name,
+            },
+        )
+
+    # Find missing warehouse accounts
+    resp = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Warehouse",
+        method="GET",
+        params={
+            "limit_page_length": 500,
+            "fields": '["name","is_group","account","company","disabled"]',
+            "filters": json.dumps([["company", "=", company_name], ["disabled", "=", 0]]),
+        },
+    )
+    warehouses = resp.get("data", []) if isinstance(resp, dict) else []
+    missing = [
+        w.get("name")
+        for w in warehouses
+        if isinstance(w, dict)
+        and int(w.get("is_group") or 0) == 0
+        and not (w.get("account") or "").strip()
+        and w.get("name")
+    ]
+
+    target = missing
+    if req.warehouses:
+        requested = {w.strip() for w in req.warehouses if isinstance(w, str) and w.strip()}
+        target = [w for w in missing if w in requested]
+
+    if req.dry_run:
+        return {
+            "dry_run": True,
+            "company": company_name,
+            "stock_asset_account": stock_asset_account,
+            "missing": missing,
+            "to_update": target,
+            "updated": [],
+        }
+
+    updated = []
+    for w_name in target:
+        try:
+            erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path=f"resource/Warehouse/{quote(w_name)}",
+                method="PUT",
+                json_data={"account": stock_asset_account},
+            )
+            updated.append(w_name)
+        except Exception:
+            continue
+
+    return {
+        "dry_run": False,
+        "company": company_name,
+        "stock_asset_account": stock_asset_account,
+        "missing": missing,
+        "to_update": target,
+        "updated": updated,
+    }
+
+
 @router.get("/warehouses/{warehouse_name}")
 async def get_warehouse(
     warehouse_name: str,
@@ -653,7 +946,8 @@ async def delete_warehouse(
 async def create_stock_entry(
     entry: StockEntryCreate,
     tenant_id: str = Depends(require_tenant_access),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Create a stock entry (Material Receipt, Issue, or Transfer).
@@ -662,10 +956,23 @@ async def create_stock_entry(
     - Material Issue: Issue stock from warehouse (set s_warehouse for each item)
     - Material Transfer: Transfer between warehouses (set both s_warehouse and t_warehouse)
     """
+    def _none_if_blank(value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    # Normalize optional strings (frontend sometimes sends empty strings)
+    entry.from_warehouse = _none_if_blank(entry.from_warehouse)
+    entry.to_warehouse = _none_if_blank(entry.to_warehouse)
+
     # Prepare items
     items_data = []
     for item in entry.items:
         item_dict = item.model_dump()
+        item_dict["s_warehouse"] = _none_if_blank(item_dict.get("s_warehouse"))
+        item_dict["t_warehouse"] = _none_if_blank(item_dict.get("t_warehouse"))
         # Set warehouse based on entry type if not specified
         if entry.stock_entry_type == "Material Receipt" and not item_dict.get("t_warehouse"):
             item_dict["t_warehouse"] = entry.to_warehouse
@@ -684,6 +991,98 @@ async def create_stock_entry(
             item_dict["source_warehouse"] = item_dict["s_warehouse"]
         
         items_data.append(item_dict)
+
+    # Validate required warehouse fields before hitting ERPNext
+    missing = []
+    for idx, item in enumerate(items_data, start=1):
+        if entry.stock_entry_type == "Material Receipt" and not item.get("t_warehouse"):
+            missing.append({"row": idx, "missing": "t_warehouse"})
+        elif entry.stock_entry_type == "Material Issue" and not item.get("s_warehouse"):
+            missing.append({"row": idx, "missing": "s_warehouse"})
+        elif entry.stock_entry_type == "Material Transfer":
+            if not item.get("s_warehouse"):
+                missing.append({"row": idx, "missing": "s_warehouse"})
+            if not item.get("t_warehouse"):
+                missing.append({"row": idx, "missing": "t_warehouse"})
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Missing required warehouse fields for stock entry items",
+                "stock_entry_type": entry.stock_entry_type,
+                "missing": missing,
+            },
+        )
+
+    # ERPNext UI requires Basic Rate for Material Receipt to create correct valuation/GL entries.
+    # Enforce it here so API behavior matches UI expectations.
+    if entry.stock_entry_type == "Material Receipt":
+        missing_rates = []
+        for idx, item in enumerate(items_data, start=1):
+            basic_rate = item.get("basic_rate")
+            if basic_rate is None or basic_rate <= 0:
+                missing_rates.append({"row": idx, "missing": "basic_rate"})
+
+        if missing_rates:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Basic Rate is required for Material Receipt items",
+                    "stock_entry_type": entry.stock_entry_type,
+                    "missing": missing_rates,
+                },
+            )
+
+    # Pre-validate stock for issues/transfers to avoid ERPNext stock ledger failures on submit.
+    # (Receipts don't require available stock.)
+    if entry.stock_entry_type in {"Material Issue", "Material Transfer"}:
+        inventory_service = InventoryIntegrationService(erpnext_adapter, tenant_id)
+        await inventory_service.validate_stock_availability(
+            items=[
+                {
+                    "item_code": i.get("item_code"),
+                    "qty": i.get("qty"),
+                    # Use source warehouse for validation
+                    "warehouse": i.get("s_warehouse"),
+                }
+                for i in items_data
+            ],
+            warehouse=entry.from_warehouse or "",
+        )
+
+    # Resolve company from tenant context to avoid InvalidWarehouseCompany errors on submit.
+    company_name = (entry.company or "").strip() or None
+    if not company_name:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if tenant:
+            if tenant.tenant_settings and tenant.tenant_settings.company_name:
+                company_name = tenant.tenant_settings.company_name
+            else:
+                company_name = tenant.name
+
+    if not company_name:
+        try:
+            companies_response = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Company",
+                method="GET",
+                params={"limit_page_length": 5},
+            )
+            companies = companies_response.get("data", []) if isinstance(companies_response, dict) else []
+            if len(companies) == 1:
+                company_name = companies[0].get("name")
+        except Exception:
+            company_name = None
+
+    if not company_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Unable to resolve company for this tenant. Configure tenant_settings.company_name or ensure exactly one ERPNext Company exists.",
+                "tenant_id": tenant_id,
+            },
+        )
     
     # Ensure parent-level warehouses are set when items include them (ERPNext compatibility)
     from_warehouse = entry.from_warehouse
@@ -702,7 +1101,7 @@ async def create_stock_entry(
     payload = {
         "stock_entry_type": entry.stock_entry_type,
         "purpose": entry.stock_entry_type,
-        "company": entry.company,
+        "company": company_name,
         "posting_date": entry.posting_date or datetime.now().strftime("%Y-%m-%d"),
         "items": items_data
     }
@@ -816,6 +1215,25 @@ async def submit_stock_entry(
     entry_data = entry.get("data") if isinstance(entry, dict) and "data" in entry else entry
     if not entry_data:
         raise HTTPException(status_code=404, detail="Stock Entry not found")
+
+    # Re-validate stock right before submit (drafts can linger; stock can change).
+    stock_entry_type = entry_data.get("stock_entry_type") or entry_data.get("purpose")
+    if stock_entry_type in {"Material Issue", "Material Transfer"}:
+        inventory_service = InventoryIntegrationService(erpnext_adapter, tenant_id)
+        items = entry_data.get("items") or []
+        await inventory_service.validate_stock_availability(
+            items=[
+                {
+                    "item_code": i.get("item_code"),
+                    "qty": i.get("qty"),
+                    "warehouse": i.get("s_warehouse"),
+                }
+                for i in items
+                if i.get("item_code") and i.get("qty") is not None
+            ],
+            warehouse=entry_data.get("from_warehouse") or "",
+        )
+
     result = erpnext_adapter.proxy_request(
         tenant_id=tenant_id,
         path="method/frappe.client.submit",
@@ -827,6 +1245,79 @@ async def submit_stock_entry(
         }
     )
     return ResponseNormalizer.normalize_erpnext(result)
+
+
+@router.get("/stock-entries/{entry_name}/posting")
+async def get_stock_entry_posting(
+    entry_name: str,
+    limit: int = Query(50, le=200),
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+):
+    """Fetch ERPNext posting artifacts for a Stock Entry.
+
+    Returns related General Ledger (GL Entry) rows and Stock Ledger Entry rows.
+    This is intended as a lightweight "did it post correctly?" verification.
+    """
+    import json
+
+    filters = json.dumps([
+        ["voucher_type", "=", "Stock Entry"],
+        ["voucher_no", "=", entry_name],
+    ])
+
+    gl_params = {
+        "filters": filters,
+        "fields": json.dumps([
+            "name",
+            "posting_date",
+            "account",
+            "debit",
+            "credit",
+            "voucher_type",
+            "voucher_no",
+            "remarks",
+        ]),
+        "limit_page_length": limit,
+    }
+
+    sle_params = {
+        "filters": filters,
+        "fields": json.dumps([
+            "name",
+            "posting_date",
+            "item_code",
+            "warehouse",
+            "actual_qty",
+            "qty_after_transaction",
+            "voucher_type",
+            "voucher_no",
+            "stock_value_difference",
+        ]),
+        "limit_page_length": limit,
+    }
+
+    gl = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/GL Entry",
+        method="GET",
+        params=gl_params,
+    )
+    sle = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Stock Ledger Entry",
+        method="GET",
+        params=sle_params,
+    )
+
+    gl_rows = gl.get("data", []) if isinstance(gl, dict) else (gl or [])
+    sle_rows = sle.get("data", []) if isinstance(sle, dict) else (sle or [])
+
+    return {
+        "stock_entry": entry_name,
+        "gl_entries": gl_rows,
+        "stock_ledger_entries": sle_rows,
+    }
 
 
 @router.delete("/stock-entries/{entry_name}", status_code=status.HTTP_204_NO_CONTENT)

@@ -216,7 +216,9 @@ class EngineHealthService:
             
             response_time = (time.time() - start_time) * 1000
             
-            if login_success:
+            # Some ERPNext/Frappe versions return {"message": "Logged In"} on success.
+            # Treat that as authenticated to avoid false negatives.
+            if login_success or (isinstance(login_error, str) and login_error.strip() == "Logged In"):
                 return EngineHealthResult(
                     status=EngineHealthStatus.ONLINE,
                     message="ERPNext is connected and authenticated",

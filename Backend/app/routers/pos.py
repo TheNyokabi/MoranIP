@@ -14,14 +14,17 @@ Author: MoranERP Team
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
-from datetime import date
+from datetime import date, datetime, timezone
 import json
 import csv
 import io
 import logging
+import uuid
+import hashlib
 
 logger = logging.getLogger(__name__)
 from app.services.erpnext_client import erpnext_adapter
+from app.config import settings
 from app.dependencies.auth import get_current_user, require_tenant_access
 from app.middleware.response_normalizer import ResponseNormalizer
 from app.services.pos.pos_service_factory import get_pos_service
@@ -30,6 +33,32 @@ from app.services.pos.vat_service import VATService
 from app.services.pos.gl_distribution_service import GLDistributionService
 from app.services.pos.accounting_integration import AccountingIntegrationService
 from app.services.pos.inventory_integration import InventoryIntegrationService
+from app.database import get_db
+from sqlalchemy.orm import Session
+from app.models.rbac import Role
+from app.models.pos_warehouse_access import WarehouseAccessRole, WarehouseAccessUser
+from app.models.iam import Tenant
+
+try:
+    from redis.asyncio import Redis
+except Exception:  # pragma: no cover
+    Redis = None  # type: ignore
+
+_redis_client = None
+
+
+def _get_redis_client():
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    if Redis is None:
+        return None
+    try:
+        _redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        return _redis_client
+    except Exception:
+        _redis_client = None
+        return None
 
 router = APIRouter(
     tags=["Point of Sale"]
@@ -60,6 +89,25 @@ class POSInvoiceRequest(BaseModel):
     payments: List[POSPayment]
     is_vatable: bool = Field(True, description="Whether this invoice is subject to VAT")
     notes: Optional[str] = None
+
+
+class POSBulkStockRequest(BaseModel):
+    pos_profile_id: Optional[str] = Field(None, description="POS Profile ID (preferred). Used to resolve warehouse server-side")
+    warehouse: Optional[str] = Field(None, description="Warehouse override (optional). If provided, takes precedence")
+    item_codes: List[str] = Field(..., min_length=1, description="Item codes to fetch stock for")
+
+
+class POSBulkStockEntry(BaseModel):
+    item_code: str
+    qty: float
+
+
+class POSBulkStockResponse(BaseModel):
+    warehouse: str
+    pos_profile_id: Optional[str] = None
+    as_of: str
+    stocks: List[POSBulkStockEntry]
+    missing_item_codes: List[str] = Field(default_factory=list)
 
 
 class CustomerCreate(BaseModel):
@@ -102,6 +150,7 @@ async def list_items(
                 "item_name",
                 "standard_rate",
                 "stock_uom",
+                "is_stock_item",
                 "description",
                 "image"
             ]),
@@ -120,6 +169,7 @@ async def list_items(
             "item_name": item.get("item_name") or item_code,
             "standard_rate": item.get("standard_rate") or 0,
             "stock_uom": item.get("stock_uom") or "Nos",
+            "is_stock_item": bool(item.get("is_stock_item")) if item.get("is_stock_item") is not None else None,
             "description": item.get("description"),
             "image": item.get("image")
         })
@@ -232,18 +282,153 @@ async def get_item_stock(
             return {"item_code": item_code, "warehouse": warehouse, "qty": 0}
 
 
+@router.post("/stock/bulk", response_model=POSBulkStockResponse)
+async def get_bulk_item_stock(
+    request: POSBulkStockRequest,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+):
+    """Bulk stock lookup for multiple items in a warehouse.
+
+    Designed for POS grid rendering: fetches quantities in one ERPNext call.
+    Uses Bin.projected_qty when available, falling back to Bin.actual_qty.
+
+    Caches results briefly (default 15s) to reduce load while keeping stock reasonably fresh.
+    """
+
+    warehouse = (request.warehouse or "").strip() or None
+    pos_profile_id = (request.pos_profile_id or "").strip() or None
+    item_codes_raw = request.item_codes or []
+
+    # De-dupe item codes while preserving input order
+    seen = set()
+    item_codes: List[str] = []
+    for code in item_codes_raw:
+        if not code:
+            continue
+        if code in seen:
+            continue
+        seen.add(code)
+        item_codes.append(code)
+
+    if not item_codes:
+        raise HTTPException(status_code=422, detail="item_codes must not be empty")
+
+    if warehouse is None and pos_profile_id is None:
+        raise HTTPException(status_code=422, detail="Provide either pos_profile_id or warehouse")
+
+    if warehouse is None and pos_profile_id is not None:
+        profile = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/POS Profile/{pos_profile_id}",
+            method="GET",
+        )
+        profile_data = profile.get("data") if isinstance(profile, dict) else profile
+        if not isinstance(profile_data, dict):
+            raise HTTPException(status_code=404, detail="POS Profile not found")
+        warehouse = (profile_data.get("warehouse") or "").strip() or None
+
+    if not warehouse:
+        raise HTTPException(status_code=400, detail="Could not resolve warehouse")
+
+    # Short-lived cache (freshness > hit rate)
+    redis_client = _get_redis_client()
+    cache_ttl_seconds = 15
+    cache_key = None
+    if redis_client is not None:
+        try:
+            item_codes_key = ",".join(sorted(item_codes))
+            digest = hashlib.sha1(item_codes_key.encode("utf-8")).hexdigest()
+            cache_key = f"pos:stockbulk:{tenant_id}:{warehouse}:{digest}"
+            cached = await redis_client.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            cache_key = None
+
+    # Query ERPNext Bin (reservation-aware via projected_qty)
+    filters = [["warehouse", "=", warehouse], ["item_code", "in", item_codes]]
+    bin_result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Bin",
+        method="GET",
+        params={
+            "fields": json.dumps(["item_code", "projected_qty", "actual_qty"]),
+            "filters": json.dumps(filters),
+            "limit_page_length": max(len(item_codes), 1),
+        },
+    )
+
+    bin_rows = []
+    if isinstance(bin_result, dict):
+        bin_rows = bin_result.get("data", []) or []
+    elif isinstance(bin_result, list):
+        bin_rows = bin_result
+
+    qty_by_item: Dict[str, float] = {}
+    for row in bin_rows:
+        if not isinstance(row, dict):
+            continue
+        code = row.get("item_code")
+        if not code:
+            continue
+        projected = row.get("projected_qty")
+        actual = row.get("actual_qty")
+        value = projected if projected is not None else actual
+        try:
+            qty_by_item[str(code)] = float(value or 0)
+        except Exception:
+            qty_by_item[str(code)] = 0.0
+
+    missing_item_codes = [code for code in item_codes if code not in qty_by_item]
+    stocks = [{"item_code": code, "qty": float(qty_by_item.get(code, 0.0))} for code in item_codes]
+
+    response = {
+        "warehouse": warehouse,
+        "pos_profile_id": pos_profile_id,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "stocks": stocks,
+        "missing_item_codes": missing_item_codes,
+    }
+
+    if redis_client is not None and cache_key is not None:
+        try:
+            await redis_client.setex(cache_key, cache_ttl_seconds, json.dumps(response))
+        except Exception:
+            pass
+
+    return response
+
+
 # ==================== Warehouse Endpoints ====================
 
 @router.get("/warehouses")
 async def list_warehouses(
+    include_all: bool = Query(False, description="Admin-only: include all warehouses for this tenant (company-scoped), not just those with active POS profiles"),
     tenant_id: str = Depends(require_tenant_access),
     current_user: dict = Depends(get_current_user),
-    pos_service: PosServiceBase = Depends(get_pos_service)
+    pos_service: PosServiceBase = Depends(get_pos_service),
+    db: Session = Depends(get_db)
 ):
     """
     Get warehouses filtered by active POS Profiles.
     Returns only warehouses with active profiles, including profile_id.
     """
+    roles = current_user.get("roles", [])
+    is_pos_admin = bool(current_user.get("is_super_admin")) or any(r in roles for r in ("SUPER_ADMIN", "OWNER", "ADMIN", "MANAGER"))
+
+    # Resolve tenant company name (for tenant/workspace scoping)
+    tenant_company = None
+    try:
+        tenant_uuid = uuid.UUID(tenant_id)
+        tenant_obj = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+        tenant_company = tenant_obj.name if tenant_obj else None
+    except ValueError:
+        tenant_company = None
+
+    if include_all and not is_pos_admin:
+        raise HTTPException(status_code=403, detail="Only admin users can request include_all warehouses")
+
     # Get all POS Profiles
     try:
         profiles = await pos_service.list_profiles(limit=1000)
@@ -251,32 +436,116 @@ async def list_warehouses(
         profiles = []
     
     # Get all warehouses
+    # Get all warehouses (scoped to tenant's company when possible)
+    warehouse_params = None
+    if tenant_company:
+        warehouse_params = {
+            "filters": json.dumps([["company", "=", tenant_company]]),
+            "limit_page_length": 1000,
+        }
+
     warehouses = erpnext_adapter.proxy_request(
         tenant_id=tenant_id,
         path="resource/Warehouse",
-        method="GET"
+        method="GET",
+        params=warehouse_params,
     )
-    
-    if not warehouses:
+
+    # Normalize ERPNext list response
+    if isinstance(warehouses, dict):
+        warehouses = warehouses.get("data", [])
+    elif not isinstance(warehouses, list):
         warehouses = []
     
     # Create mapping of warehouse to profile_id
     warehouse_to_profile = {}
+    profile_to_warehouse = {}
     for profile in profiles:
         warehouse_name = profile.get("warehouse")
         if warehouse_name:
             profile_id = profile.get("name") or profile.get("id")
             if profile_id:
                 warehouse_to_profile[warehouse_name] = profile_id
+                profile_to_warehouse[profile_id] = warehouse_name
     
-    # Filter warehouses to only those with active profiles
-    # and add profile_id to each warehouse
+    # Filter warehouses
+    # Default: only warehouses with active POS profiles (keeps POS UI expectations)
+    # Admin include_all: return all company-scoped warehouses, and attach profile_id when available
     filtered_warehouses = []
     for warehouse in warehouses:
         warehouse_name = warehouse.get("name") or warehouse.get("warehouse_name")
+        if not warehouse_name:
+            continue
+
+        if include_all and is_pos_admin:
+            if warehouse_name in warehouse_to_profile:
+                warehouse["profile_id"] = warehouse_to_profile[warehouse_name]
+            filtered_warehouses.append(warehouse)
+            continue
+
         if warehouse_name in warehouse_to_profile:
             warehouse["profile_id"] = warehouse_to_profile[warehouse_name]
             filtered_warehouses.append(warehouse)
+
+    # Apply warehouse access rules for cashiers
+    allowed_warehouses = None
+
+    if "CASHIER" in roles and not is_pos_admin:
+        try:
+            tenant_uuid = uuid.UUID(tenant_id)
+        except ValueError:
+            tenant_uuid = None
+
+        role = db.query(Role).filter(Role.code == "CASHIER").first()
+        if role and tenant_uuid:
+            role_entries = db.query(WarehouseAccessRole).filter(
+                WarehouseAccessRole.tenant_id == tenant_uuid,
+                WarehouseAccessRole.role_id == role.id
+            ).all()
+            if role_entries:
+                allowed_warehouses = {entry.warehouse_name for entry in role_entries}
+
+        user_id = current_user.get("user_id")
+        if user_id and tenant_uuid:
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                user_uuid = None
+
+            if user_uuid:
+                user_entries = db.query(WarehouseAccessUser).filter(
+                    WarehouseAccessUser.tenant_id == tenant_uuid,
+                    WarehouseAccessUser.user_id == user_uuid
+                ).all()
+                if user_entries:
+                    # User overrides take precedence over role mappings when present
+                    allowed_warehouses = {entry.warehouse_name for entry in user_entries}
+
+    if allowed_warehouses is not None:
+        filtered_warehouses = [
+            warehouse for warehouse in filtered_warehouses
+            if (warehouse.get("name") or warehouse.get("warehouse_name")) in allowed_warehouses
+        ]
+
+    # Enforce one open session per warehouse for cashiers
+    if "CASHIER" in roles and not is_pos_admin:
+        try:
+            open_sessions = await pos_service.list_sessions(status="Open", limit=1000)
+        except Exception:
+            open_sessions = []
+
+        if open_sessions:
+            open_warehouses = set()
+            for session in open_sessions:
+                profile_id = session.get("pos_profile")
+                if profile_id in profile_to_warehouse:
+                    open_warehouses.add(profile_to_warehouse[profile_id])
+
+            if open_warehouses:
+                filtered_warehouses = [
+                    warehouse for warehouse in filtered_warehouses
+                    if (warehouse.get("name") or warehouse.get("warehouse_name")) not in open_warehouses
+                ]
     
     return {"warehouses": filtered_warehouses}
 
@@ -527,13 +796,53 @@ async def create_invoice(
         )
     logger.info(f"Using warehouse from POS profile: {profile_warehouse}")
 
+    # Ensure warehouse is not a group node
+    try:
+        wh_doc = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/Warehouse/{profile_warehouse}",
+            method="GET"
+        )
+        wh_data = wh_doc.get("data") if isinstance(wh_doc, dict) else wh_doc
+        if isinstance(wh_data, dict) and wh_data.get("is_group") == 1:
+            logger.warning(f"Warehouse {profile_warehouse} is a group; resolving a child warehouse")
+            child_response = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Warehouse",
+                method="GET",
+                params={
+                    "filters": json.dumps([
+                        ["parent_warehouse", "=", profile_warehouse],
+                        ["is_group", "=", 0]
+                    ]),
+                    "fields": '["name"]',
+                    "limit_page_length": 1
+                }
+            )
+            child_list = child_response.get("data", []) if isinstance(child_response, dict) else []
+            if child_list:
+                profile_warehouse = child_list[0].get("name")
+                logger.info(f"Using child warehouse: {profile_warehouse}")
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": "warehouse_group_not_allowed",
+                        "message": f"Warehouse {profile_warehouse} is a group and has no child warehouses for transactions"
+                    }
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Failed to validate warehouse group status: {e}")
+
     # Override company if profile has a valid company
     profile_company = profile.get('company')
     if profile_company and (not company_names or profile_company in company_names):
         company = profile_company
         logger.info(f"Using company from POS profile: {company}")
 
-    # Validate customer exists
+    # Validate customer exists (auto-create for new customers)
     try:
         customer_result = erpnext_adapter.proxy_request(
             tenant_id=tenant_id,
@@ -543,15 +852,30 @@ async def create_invoice(
         logger.info(f"Customer {invoice.customer} validated for tenant {tenant_id}")
     except HTTPException as e:
         if e.status_code == 404:
-            logger.error(f"Customer {invoice.customer} not found for tenant {tenant_id}")
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "type": "customer_not_found",
-                    "message": f"Customer {invoice.customer} not found",
-                    "customer": invoice.customer
-                }
-            )
+            logger.warning(f"Customer {invoice.customer} not found; creating new customer")
+            customer_group = invoice.customer_type if invoice.customer_type in ["Direct", "Fundi", "Sales Team", "Wholesaler"] else "Direct"
+            try:
+                erpnext_adapter.proxy_request(
+                    tenant_id=tenant_id,
+                    path="resource/Customer",
+                    method="POST",
+                    json_data={
+                        "customer_name": invoice.customer,
+                        "customer_group": customer_group,
+                        "customer_type": "Individual"
+                    }
+                )
+                logger.info(f"Customer {invoice.customer} created for tenant {tenant_id}")
+            except Exception as create_error:
+                logger.error(f"Failed to create customer {invoice.customer}: {create_error}")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": "customer_not_found",
+                        "message": f"Customer {invoice.customer} not found and could not be created",
+                        "customer": invoice.customer
+                    }
+                )
         else:
             raise
 
@@ -637,8 +961,15 @@ async def create_invoice(
     if not skip_stock_validation:
         try:
             await inventory_service.validate_stock_availability(
-                [{"item_code": item.item_code, "qty": item.qty} for item in invoice.items],
-                profile_warehouse
+                [
+                    {
+                        "item_code": item.item_code,
+                        "qty": item.qty,
+                        "warehouse": item.warehouse or profile_warehouse,
+                    }
+                    for item in invoice.items
+                ],
+                profile_warehouse,
             )
             logger.info(f"Stock availability validated for {len(invoice.items)} items")
         except HTTPException as e:
@@ -657,6 +988,57 @@ async def create_invoice(
     else:
         logger.info(f"Skipping stock validation for {len(invoice.items)} items (development mode)")
     
+    # Fetch accounts once for fallback mapping
+    account_names = set()
+    account_types = {}
+    account_is_group = {}
+    try:
+        accounts_result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="resource/Account",
+            method="GET",
+            params={
+                "filters": f'[[\"company\", \"=\", \"{company}\"]]',
+                "fields": '["name","account_type","is_group"]',
+                "limit_page_length": 1000
+            }
+        )
+        for acc in accounts_result.get("data", []) if isinstance(accounts_result, dict) else []:
+            name = acc.get("name")
+            if name:
+                account_names.add(name)
+                account_types[name] = acc.get("account_type")
+                account_is_group[name] = acc.get("is_group")
+    except Exception as e:
+        logger.warning(f"Failed to load account list for fallback mapping: {e}")
+
+    def pick_account_by_type(type_candidates, name_hint=None) -> Optional[str]:
+        if name_hint:
+            for name in account_names:
+                if account_is_group.get(name) == 0 and name_hint.lower() in name.lower():
+                    return name
+        for name, acc_type in account_types.items():
+            if acc_type in type_candidates and account_is_group.get(name) == 0:
+                return name
+        return None
+
+    fallback_income_account = (
+        pick_account_by_type(["Income"], "sales") or
+        pick_account_by_type(["Income"])
+    )
+    fallback_expense_account = (
+        pick_account_by_type(["Expense", "Cost of Goods Sold"], "cost of goods") or
+        pick_account_by_type(["Expense", "Cost of Goods Sold"])
+    )
+    fallback_cash_account = (
+        pick_account_by_type(["Cash"], "cash") or
+        pick_account_by_type(["Cash"])
+    )
+    fallback_bank_account = (
+        pick_account_by_type(["Bank"], "bank") or
+        pick_account_by_type(["Bank"])
+    )
+
     # Prepare items with warehouse from profile and fetch item details
     items_data = []
     items_for_vat = []
@@ -707,11 +1089,16 @@ async def create_invoice(
             or item_detail.get("default_income_account")
             or f"Sales - {company}"
         )
+        if income_account not in account_names and fallback_income_account:
+            income_account = fallback_income_account
+
         expense_account = (
             item_detail.get("expense_account")
             or item_detail.get("default_expense_account")
             or f"Cost of Goods Sold - {company}"
         )
+        if expense_account not in account_names and fallback_expense_account:
+            expense_account = fallback_expense_account
         item_data = {
             "item_code": item.item_code,
             "qty": item.qty,
@@ -806,18 +1193,35 @@ async def create_invoice(
         if not payment_accounts:
             return None
         if mode in payment_accounts:
-            return payment_accounts.get(mode)
+            account = payment_accounts.get(mode)
+            if account and account not in account_names and "demo account" not in account.lower():
+                return account
+            if account and account_is_group.get(account) == 0:
+                return account
         # Case-insensitive match
         for key, value in payment_accounts.items():
             if isinstance(key, str) and key.lower() == mode.lower():
-                return value
+                if value and value not in account_names and "demo account" not in value.lower():
+                    return value
+                if value and account_is_group.get(value) == 0:
+                    return value
         # Fallback to default or first available account
         if isinstance(payment_accounts, dict):
             if payment_accounts.get("default"):
-                return payment_accounts.get("default")
+                account = payment_accounts.get("default")
+                if account and account not in account_names and "demo account" not in account.lower():
+                    return account
+                if account and account_is_group.get(account) == 0:
+                    return account
             for value in payment_accounts.values():
-                if value:
+                if value and value not in account_names and "demo account" not in value.lower():
                     return value
+                if value and account_is_group.get(value) == 0:
+                    return value
+        # Final fallback to company cash/bank accounts
+        if "mpesa" in mode.lower() or "bank" in mode.lower():
+            return fallback_bank_account or fallback_cash_account
+        return fallback_cash_account
         return None
 
     payments_data = []
@@ -972,11 +1376,24 @@ async def list_invoices(
     current_user: dict = Depends(get_current_user)
 ):
     """List PoS invoices with optional filters."""
+    filters = [["is_pos", "=", 1]]
+    if customer_type:
+        filters.append(["customer_type", "=", customer_type])
+    if from_date:
+        filters.append(["posting_date", ">=", from_date])
+    if to_date:
+        filters.append(["posting_date", "<=", to_date])
+
     invoices = erpnext_adapter.proxy_request(
         tenant_id=tenant_id,
         path="resource/Sales Invoice",
         method="GET",
-        params={"limit_page_length": limit}
+        params={
+            "limit_page_length": limit,
+            "order_by": "creation desc",
+            "filters": json.dumps(filters),
+            "fields": '["name","customer","posting_date","grand_total","status","is_pos"]'
+        }
     )
     # Standardize response format
     if isinstance(invoices, dict):

@@ -21,6 +21,7 @@ from app.services.provisioning_service import (
     ProvisioningConfig,
     ProvisioningStatus
 )
+from app.services.engine_health_service import EngineHealthStatus
 
 router = APIRouter(
     prefix="/provisioning",
@@ -35,6 +36,7 @@ class ProvisioningConfigRequest(BaseModel):
     include_demo_data: bool = Field(default=False, description="Include demo items in provisioning")
     pos_store_enabled: bool = Field(default=True, description="Create POS Store warehouse")
     country_template: Optional[str] = Field(default=None, description="Chart of accounts template (auto-detect if not provided)")
+    template: Optional[str] = Field(default=None, description="Provisioning template (company_to_pos when ERPNext is selected)")
 
 
 class StepError(BaseModel):
@@ -104,13 +106,14 @@ def start_provisioning(
             engine_type=tenant.engine or 'erpnext'
         )
         
-        if health_result.status.value == "offline":
+        if health_result.status != EngineHealthStatus.ONLINE:
             raise HTTPException(
                 status_code=503,
                 detail={
-                    "type": "engine_offline",
-                    "message": f"Engine is offline: {health_result.message}",
-                    "engine": tenant.engine
+                    "type": "engine_unstable",
+                    "message": f"Engine not stable. Check server status before provisioning. {health_result.message}",
+                    "engine": tenant.engine,
+                    "status": health_result.status.value
                 }
             )
         
@@ -119,24 +122,34 @@ def start_provisioning(
             TenantOnboarding.tenant_id == tenant_id
         ).first()
 
+        template_value = None
+        if config and config.template:
+            template_value = config.template
+        elif tenant.engine == "erpnext":
+            template_value = "company_to_pos"
+        else:
+            template_value = "default"
+
         if not onboarding:
             onboarding = TenantOnboarding(
                 tenant_id=tenant_id,
+                template=template_value,
                 status="NOT_STARTED",
-                provisioning_type="company_to_pos",
-                provisioning_config=config.dict() if config else {},
+                provisioning_type="company_to_pos" if tenant.engine == "erpnext" else "default",
+                provisioning_config=config.dict() if config else {"template": template_value},
                 started_at=datetime.utcnow()
             )
             db.add(onboarding)
         else:
             # Reset status and clear steps for a fresh start
             onboarding.status = "NOT_STARTED"
+            onboarding.template = template_value or onboarding.template
             onboarding.provisioning_steps = {}
             onboarding.error_message = None
             onboarding.error_step = None
             onboarding.started_at = datetime.utcnow()
             onboarding.completed_at = None
-            onboarding.provisioning_config = config.dict() if config else {}
+            onboarding.provisioning_config = config.dict() if config else {"template": template_value}
         
         tenant.provisioning_status = "PROVISIONING"  # Set to PROVISIONING to prevent duplicate starts
         tenant.provisioned_at = None

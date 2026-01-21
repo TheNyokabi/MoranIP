@@ -45,8 +45,11 @@ def erpnext_health_check(
         # Test connection and login
         login_success, login_error = adapter._login(tenant_id)
         health_status["connected"] = True
-        
-        if login_success:
+
+        # Some ERPNext/Frappe versions return {"message": "Logged In"} on success.
+        # A few older adapter implementations surfaced that message as an "error" even
+        # when authentication succeeded. Treat it as success to avoid false negatives.
+        if login_success or (isinstance(login_error, str) and login_error.strip() == "Logged In"):
             health_status["authenticated"] = True
             health_status["message"] = "ERPNext is connected and authenticated successfully"
             return health_status

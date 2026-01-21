@@ -132,7 +132,8 @@ function ManageUsersInner() {
             }
 
             const data = await response.json();
-            setSuccess(`User added successfully with ${data.role} role`);
+            const userCode = data?.user?.user_code ? ` (${data.user.user_code})` : '';
+            setSuccess(`User added successfully with ${data.role} role${userCode}`);
             setSelectedUser('');
             fetchData(); // Refresh the lists
         } catch (err: any) {

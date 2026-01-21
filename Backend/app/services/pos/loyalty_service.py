@@ -87,6 +87,37 @@ class LoyaltyService:
                 "error": str(e)
             }
 
+    async def calculate_points_earned(self, purchase_amount: float, customer: str, is_birthday: bool = False) -> Dict[str, Any]:
+        """Compatibility wrapper for router: calculate points from raw float input."""
+        amount = Decimal(str(purchase_amount))
+        return await self.calculate_points(amount, customer, is_birthday)
+
+    async def check_birthday_month(self, customer: str) -> bool:
+        """Return True if current month matches customer DOB month, else False."""
+        if not self.erpnext_adapter:
+            return False
+        try:
+            customer_data = await self.erpnext_adapter.proxy_request(
+                tenant_id=self.tenant_id,
+                path=f"resource/Customer/{customer}",
+                method="GET"
+            )
+            customer_doc = customer_data.get("data") if isinstance(customer_data, dict) else customer_data
+            if not isinstance(customer_doc, dict):
+                return False
+            birthday = customer_doc.get("date_of_birth") or customer_doc.get("birthday")
+            if not birthday:
+                return False
+            try:
+                dob = datetime.fromisoformat(str(birthday).replace('Z', '+00:00'))
+            except ValueError:
+                return False
+            now = datetime.now()
+            return dob.month == now.month
+        except Exception as e:
+            logger.warning(f"Birthday check failed for customer {customer}: {e}")
+            return False
+
     async def award_points(self, customer: str, points: int, reason: str, invoice_id: str = None) -> bool:
         """
         Award points to customer

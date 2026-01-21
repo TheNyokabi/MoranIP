@@ -6,6 +6,7 @@ Create Date: 2026-01-09
 
 """
 from alembic import op
+import os
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -22,8 +23,19 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def upgrade():
+    if os.getenv("SKIP_TEST_SEED", "").lower() in {"1", "true", "yes"}:
+        print("Skipping test user seed: SKIP_TEST_SEED is set")
+        return
     conn = op.get_bind()
     session = Session(bind=conn)
+
+    # Skip if base IAM tables are not present
+    table_exists = conn.execute(
+        sa.text("SELECT to_regclass('public.users')")
+    ).scalar()
+    if not table_exists:
+        print("Skipping test user seed: users table does not exist")
+        return
     
     # Create test user
     test_email = "testuser@techmart.com"
@@ -31,7 +43,7 @@ def upgrade():
     
     # Check if user already exists
     result = conn.execute(
-        sa.text("SELECT id FROM iam_users WHERE email = :email"),
+        sa.text("SELECT id FROM users WHERE email = :email"),
         {"email": test_email}
     )
     existing = result.fetchone()
@@ -43,8 +55,8 @@ def upgrade():
         
         conn.execute(
             sa.text("""
-                INSERT INTO iam_users (id, user_code, email, password_hash, full_name, kyc_tier, status, created_at)
-                VALUES (:id, :code, :email, :password, :name, :tier, :status, :created_at)
+                INSERT INTO users (id, user_code, email, password_hash, full_name, kyc_tier, user_type, is_active, created_at, updated_at)
+                VALUES (:id, :code, :email, :password, :name, :tier, :user_type, :is_active, :created_at, :updated_at)
             """),
             {
                 "id": user_id,
@@ -52,9 +64,11 @@ def upgrade():
                 "email": test_email,
                 "password": hashed_password,
                 "name": "Test User",
-                "tier": "VERIFIED",
-                "status": "ACTIVE",
-                "created_at": datetime.utcnow()
+                "tier": "KYC-T1",
+                "user_type": "INTERNAL",
+                "is_active": True,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
             }
         )
         print(f"Created test user: {test_email}")
@@ -66,7 +80,12 @@ def upgrade():
 
 def downgrade():
     conn = op.get_bind()
+    table_exists = conn.execute(
+        sa.text("SELECT to_regclass('public.users')")
+    ).scalar()
+    if not table_exists:
+        return
     conn.execute(
-        sa.text("DELETE FROM iam_users WHERE email = :email"),
+        sa.text("DELETE FROM users WHERE email = :email"),
         {"email": "testuser@techmart.com"}
     )

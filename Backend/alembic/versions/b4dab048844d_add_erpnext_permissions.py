@@ -155,12 +155,12 @@ def upgrade() -> None:
         CROSS JOIN permissions p
         WHERE r.code = 'ADMIN'
           AND p.code LIKE 'erpnext:%'
-          AND p.code != 'erpnext:*:delete'
+          AND p.code != :exclude_code
           AND NOT EXISTS (
               SELECT 1 FROM role_permissions rp 
               WHERE rp.role_id = r.id AND rp.permission_id = p.id
           )
-    """))
+    """), {"exclude_code": "erpnext:*:delete"})
     
     # MANAGER gets view and create permissions for all ERPNext resources
     conn.execute(text("""

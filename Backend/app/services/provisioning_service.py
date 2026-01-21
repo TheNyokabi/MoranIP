@@ -8,6 +8,7 @@ Author: MoranERP Team
 """
 
 import logging
+import json
 import time
 import uuid
 import re
@@ -563,7 +564,10 @@ class ProvisioningService:
             "step_8_pos_profile": self._step_pos_profile,
             "step_9_pos_session": self._step_pos_session,
             "step_10_paint_setup": self._step_paint_setup,
-            "step_11_post_sale_updates": self._step_post_sale_updates
+            # Current provisioning flow uses step_10_post_sale_updates (see PROVISIONING_STEPS).
+            # Keep step_11_post_sale_updates as an alias in case the step list is updated.
+            "step_10_post_sale_updates": self._step_post_sale_updates,
+            "step_11_post_sale_updates": self._step_post_sale_updates,
         }
         
         method = step_methods.get(step_name)
@@ -577,6 +581,43 @@ class ProvisioningService:
         total_steps = len([s for s in self.PROVISIONING_STEPS if s != "step_6_items" or config.include_demo_data])
         completed = len([s for s, d in steps.items() if d.get("status") in ["completed", "exists", "skipped"]])
         return (completed / total_steps * 100) if total_steps > 0 else 0.0
+
+    def _ensure_engine_online(
+        self,
+        tenant_id: str,
+        step_name: str,
+        db: Session,
+        correlation_id: str
+    ) -> Optional[StepResult]:
+        """Verify engine is online before running a critical ERPNext step."""
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if not tenant:
+            return StepResult(
+                step_name=step_name,
+                status="failed",
+                message="Tenant not found for engine health check",
+                error="Tenant not found",
+                duration_ms=0
+            )
+
+        engine_type = tenant.engine or "erpnext"
+        health_result = engine_health_service.check_engine_health(
+            tenant_id=tenant_id,
+            engine_type=engine_type,
+            force_refresh=True,
+            correlation_id=correlation_id
+        )
+
+        if health_result.status != EngineHealthStatus.ONLINE:
+            return StepResult(
+                step_name=step_name,
+                status="failed",
+                message=f"Engine not stable. Check server status before provisioning. {health_result.message}",
+                error=health_result.error or health_result.message,
+                duration_ms=0
+            )
+
+        return None
     
     def _handle_erpnext_error(
         self,
@@ -658,14 +699,16 @@ class ProvisioningService:
             engine_type = tenant.engine or "erpnext"
             health_result = engine_health_service.check_engine_health(
                 tenant_id=tenant_id,
-                engine_type=engine_type
+                engine_type=engine_type,
+                force_refresh=True,
+                correlation_id=correlation_id
             )
             
-            if health_result.status.value == "offline":
+            if health_result.status != EngineHealthStatus.ONLINE:
                 return StepResult(
                     step_name="step_0_engine_check",
                     status="failed",
-                    message=f"Engine is offline: {health_result.message}",
+                    message=f"Engine not stable. Check server status before provisioning. {health_result.message}",
                     error=health_result.error or health_result.message,
                     duration_ms=(time.time() - start_time) * 1000
                 )
@@ -716,10 +759,50 @@ class ProvisioningService:
     ) -> StepResult:
         """Step 2: Create Company"""
         start_time = time.time()
+
+        health_check = self._ensure_engine_online(
+            tenant_id=tenant_id,
+            step_name="step_2_company",
+            db=db,
+            correlation_id=correlation_id
+        )
+        if health_check:
+            return health_check
         
         try:
             tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
             company_name = tenant.name
+
+            # Ensure required ERPNext master data exists before creating the Company.
+            # ERPNext may attempt to create default warehouses (e.g., Transit) during
+            # company setup and will hard-fail if the Warehouse Type doesn't exist.
+            required_warehouse_types = [
+                "Transit",
+            ]
+
+            for warehouse_type_name in required_warehouse_types:
+                try:
+                    erpnext_adapter.get_resource("Warehouse Type", warehouse_type_name, tenant_id)
+                except HTTPException as e:
+                    if e.status_code != 404:
+                        raise
+
+                    try:
+                        erpnext_adapter.create_resource(
+                            "Warehouse Type",
+                            {
+                                "name": warehouse_type_name,
+                                "description": "System-created by MoranERP provisioning",
+                            },
+                            tenant_id,
+                        )
+                        logger.info(
+                            f"[{correlation_id}] Created missing ERPNext Warehouse Type: {warehouse_type_name}"
+                        )
+                    except HTTPException as create_err:
+                        # Treat duplicates as idempotent success.
+                        if create_err.status_code != 409:
+                            raise
             
             # Check if company exists (idempotency) - check by both name and abbreviation
             companies_response = erpnext_adapter.proxy_request(
@@ -938,6 +1021,15 @@ class ProvisioningService:
     ) -> StepResult:
         """Step 3: Import Chart of Accounts"""
         start_time = time.time()
+
+        health_check = self._ensure_engine_online(
+            tenant_id=tenant_id,
+            step_name="step_3_chart_of_accounts",
+            db=db,
+            correlation_id=correlation_id
+        )
+        if health_check:
+            return health_check
         
         try:
             import json
@@ -1483,6 +1575,48 @@ class ProvisioningService:
                 "territory": "All Territories",
                 "maintain_same_rate": 1
             }
+
+            # Some ERPNext setups (or custom scripts) expect this field to exist on Selling Settings.
+            # Create it if missing to avoid server-side AttributeError during save.
+            try:
+                selling_cf_filters = json.dumps([
+                    ["dt", "=", "Selling Settings"],
+                    ["fieldname", "=", "fallback_to_default_price_list"],
+                ])
+                selling_cf_check = erpnext_adapter.proxy_request(
+                    tenant_id,
+                    "resource/Custom Field",
+                    method="GET",
+                    params={
+                        "filters": selling_cf_filters,
+                        "fields": json.dumps(["name"]),
+                        "limit_page_length": 1,
+                    },
+                )
+                if not (isinstance(selling_cf_check, dict) and selling_cf_check.get("data")):
+                    selling_cf_payload = {
+                        "dt": "Selling Settings",
+                        "fieldname": "fallback_to_default_price_list",
+                        "label": "Fallback To Default Price List",
+                        "fieldtype": "Check",
+                        "insert_after": "maintain_same_rate",
+                    }
+                    try:
+                        erpnext_adapter.create_resource("Custom Field", selling_cf_payload, tenant_id)
+                    except Exception:
+                        erpnext_adapter.proxy_request(
+                            tenant_id,
+                            "method/frappe.client.insert",
+                            method="POST",
+                            json_data={
+                                "doc": {"doctype": "Custom Field", **selling_cf_payload},
+                                "ignore_permissions": 1,
+                            },
+                        )
+            except Exception:
+                # Non-critical; proceed with settings update.
+                pass
+
             erpnext_adapter.update_selling_settings(tenant_id, selling_settings)
             
             # Ensure Global Defaults default_company is set for link validation
@@ -1671,6 +1805,51 @@ class ProvisioningService:
         start_time = time.time()
         
         try:
+            # Some ERPNext setups (or custom scripts) expect name fields on Customer.
+            # Create them as custom fields if missing to avoid server-side AttributeError.
+            try:
+                for fieldname, label in [
+                    ("first_name", "First Name"),
+                    ("last_name", "Last Name"),
+                    ("prospect_name", "Prospect Name"),
+                ]:
+                    customer_cf_filters = json.dumps([
+                        ["dt", "=", "Customer"],
+                        ["fieldname", "=", fieldname],
+                    ])
+                    customer_cf_check = erpnext_adapter.proxy_request(
+                        tenant_id,
+                        "resource/Custom Field",
+                        method="GET",
+                        params={
+                            "filters": customer_cf_filters,
+                            "fields": json.dumps(["name"]),
+                            "limit_page_length": 1,
+                        },
+                    )
+                    if not (isinstance(customer_cf_check, dict) and customer_cf_check.get("data")):
+                        customer_cf_payload = {
+                            "dt": "Customer",
+                            "fieldname": fieldname,
+                            "label": label,
+                            "fieldtype": "Data",
+                            "insert_after": "customer_name",
+                        }
+                        try:
+                            erpnext_adapter.create_resource("Custom Field", customer_cf_payload, tenant_id)
+                        except Exception:
+                            erpnext_adapter.proxy_request(
+                                tenant_id,
+                                "method/frappe.client.insert",
+                                method="POST",
+                                json_data={
+                                    "doc": {"doctype": "Custom Field", **customer_cf_payload},
+                                    "ignore_permissions": 1,
+                                },
+                            )
+            except Exception:
+                pass
+
             # Check if Walk-In Customer exists
             customers_response = erpnext_adapter.proxy_request(
                 tenant_id,

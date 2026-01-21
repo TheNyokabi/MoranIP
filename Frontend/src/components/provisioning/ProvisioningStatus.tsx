@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
-import { provisioningApi, ProvisioningStatus as ProvisioningStatusType } from '@/lib/api';
+import { apiFetch, ApiError, provisioningApi, ProvisioningConfig, ProvisioningStatus as ProvisioningStatusType } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -27,6 +27,7 @@ interface ProvisioningStatusProps {
     onError?: (error: string) => void
     autoRefresh?: boolean
     refreshInterval?: number
+    startConfig?: ProvisioningConfig
 }
 
 const STEP_NAMES: Record<string, string> = {
@@ -47,6 +48,7 @@ export function ProvisioningStatus({
     onError,
     autoRefresh = true,
     refreshInterval = 2000,
+    startConfig,
 }: ProvisioningStatusProps) {
     const { token } = useAuthStore();
     const [status, setStatus] = useState<ProvisioningStatusType | null>(null);
@@ -56,6 +58,10 @@ export function ProvisioningStatus({
     const [logs, setLogs] = useState<any[]>([]);
     const [hasNotifiedError, setHasNotifiedError] = useState(false);
     const [hasNotifiedComplete, setHasNotifiedComplete] = useState(false);
+    const [showHealthAction, setShowHealthAction] = useState(false);
+    const [engineHealth, setEngineHealth] = useState<any | null>(null);
+    const [healthLoading, setHealthLoading] = useState(false);
+    const [healthError, setHealthError] = useState<string | null>(null);
 
     const fetchStatus = async () => {
         try {
@@ -165,19 +171,41 @@ export function ProvisioningStatus({
     const handleStart = async () => {
         setLoading(true);
         setError(null);
+        setShowHealthAction(false);
+        setEngineHealth(null);
+        setHealthError(null);
         try {
-            await provisioningApi.startProvisioning(tenantId, {
+            const config = startConfig || {
                 include_demo_data: false,
                 pos_store_enabled: true,
-            }, token || undefined);
+            };
+            await provisioningApi.startProvisioning(tenantId, config, token || undefined);
             await fetchStatus();
         } catch (err: any) {
-            setError(err.message || 'Failed to start provisioning');
+            const errorMessage = err.message || 'Failed to start provisioning';
+            setError(errorMessage);
+            const isEngineUnstable = err instanceof ApiError
+                ? err.status === 503 && err.rawError?.detail?.type === 'engine_unstable'
+                : errorMessage.includes('Engine not stable');
+            setShowHealthAction(isEngineUnstable);
             if (onError) {
-                onError(err.message || 'Failed to start provisioning');
+                onError(errorMessage);
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCheckEngineHealth = async () => {
+        setHealthLoading(true);
+        setHealthError(null);
+        try {
+            const data = await apiFetch<any>('/erpnext/health', {}, token || undefined);
+            setEngineHealth(data);
+        } catch (err: any) {
+            setHealthError(err.message || 'Failed to check server status');
+        } finally {
+            setHealthLoading(false);
         }
     };
 
@@ -202,6 +230,20 @@ export function ProvisioningStatus({
                         <AlertCircle className="h-4 w-4" />
                         <span className="text-sm">{error}</span>
                     </div>
+                    {showHealthAction && (
+                        <div className="mt-4 space-y-2">
+                            <Button size="sm" variant="outline" onClick={handleCheckEngineHealth} disabled={healthLoading}>
+                                {healthLoading ? 'Checking server status...' : 'Check Server Status'}
+                            </Button>
+                            {healthError && <p className="text-xs text-destructive">{healthError}</p>}
+                            {engineHealth && (
+                                <div className="text-xs text-muted-foreground">
+                                    <div>Status: {engineHealth.authenticated ? 'authenticated' : 'not authenticated'}</div>
+                                    <div>Message: {engineHealth.message || 'No details provided'}</div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         );
@@ -395,6 +437,29 @@ export function ProvisioningStatus({
                         )}
                     </div>
                 ) : null}
+
+                {error && (
+                    <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+                        <div className="flex items-center gap-2 text-sm text-destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>{error}</span>
+                        </div>
+                        {showHealthAction && (
+                            <div className="mt-3 space-y-2">
+                                <Button size="sm" variant="outline" onClick={handleCheckEngineHealth} disabled={healthLoading}>
+                                    {healthLoading ? 'Checking server status...' : 'Check Server Status'}
+                                </Button>
+                                {healthError && <p className="text-xs text-destructive">{healthError}</p>}
+                                {engineHealth && (
+                                    <div className="text-xs text-muted-foreground">
+                                        <div>Status: {engineHealth.authenticated ? 'authenticated' : 'not authenticated'}</div>
+                                        <div>Message: {engineHealth.message || 'No details provided'}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Success Message */}
                 {status.status === 'COMPLETED' && (

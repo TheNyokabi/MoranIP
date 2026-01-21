@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,8 @@ interface CreateWorkspaceFormData {
     admin_name: string;
     admin_password: string;
     engine: string;
+    provisioning_template: string;
+    country_template: string;
 }
 
 export default function CreateWorkspacePage() {
@@ -51,14 +53,33 @@ export default function CreateWorkspacePage() {
 
     const [formData, setFormData] = useState<CreateWorkspaceFormData>({
         name: '',
-        category: 'Enterprise',
+        category: 'Enterprises',
         description: '',
         country_code: 'KE',
         admin_email: '',
         admin_name: '',
         admin_password: '',
         engine: 'erpnext',
+        provisioning_template: 'company_to_pos',
+        country_template: 'Kenya',
     });
+
+    useEffect(() => {
+        if (formData.category === 'Enterprises') {
+            setFormData((prev) => ({
+                ...prev,
+                engine: 'erpnext',
+                provisioning_template: prev.provisioning_template || 'company_to_pos',
+            }));
+            return;
+        }
+
+        setFormData((prev) => ({
+            ...prev,
+            engine: 'odoo',
+            provisioning_template: '',
+        }));
+    }, [formData.category]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -182,10 +203,16 @@ export default function CreateWorkspacePage() {
                             </div>
 
                             {/* Provisioning Status */}
-                            {createdWorkspace.tenant.engine === 'erpnext' && createdWorkspace.provisioning && (
+                            {createdWorkspace.tenant.engine === 'erpnext' && (
                                 <div className="mt-4">
                                     <ProvisioningStatus
                                         tenantId={createdWorkspace.tenant.id}
+                                        startConfig={{
+                                            include_demo_data: false,
+                                            pos_store_enabled: true,
+                                            country_template: formData.country_template,
+                                            template: formData.provisioning_template || undefined,
+                                        }}
                                         onComplete={() => {
                                             // Provisioning complete - update UI
                                             setCreatedWorkspace((prev: any) => ({
@@ -333,27 +360,71 @@ export default function CreateWorkspacePage() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="Enterprise">Enterprise</SelectItem>
-                                                <SelectItem value="SME">SME</SelectItem>
-                                                <SelectItem value="Startup">Startup</SelectItem>
-                                                <SelectItem value="Non-Profit">Non-Profit</SelectItem>
+                                                <SelectItem value="Chama">Chama</SelectItem>
+                                                <SelectItem value="Sacco">Sacco</SelectItem>
+                                                <SelectItem value="Enterprises">Enterprises</SelectItem>
+                                                <SelectItem value="Subscription">Subscription</SelectItem>
+                                                <SelectItem value="Collection">Collection</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
 
                                     <div>
                                         <Label htmlFor="engine" className="text-white">ERP Engine *</Label>
-                                        <Select value={formData.engine} onValueChange={(value) => handleChange('engine', value)}>
+                                        <Select
+                                            value={formData.engine}
+                                            onValueChange={(value) => handleChange('engine', value)}
+                                            disabled={formData.category !== 'Enterprises'}
+                                        >
                                             <SelectTrigger className="bg-white/5 border-white/10 text-white">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="erpnext">ERPNext</SelectItem>
-                                                <SelectItem value="odoo">Odoo</SelectItem>
+                                                {formData.category === 'Enterprises' ? (
+                                                    <SelectItem value="erpnext">ERPNext</SelectItem>
+                                                ) : (
+                                                    <SelectItem value="odoo">Odoo</SelectItem>
+                                                )}
                                             </SelectContent>
                                         </Select>
+                                        {formData.category !== 'Enterprises' && (
+                                            <p className="text-xs text-white/40 mt-1">ERPNext is available for Enterprises only</p>
+                                        )}
                                     </div>
                                 </div>
+
+                                {formData.engine === 'erpnext' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label htmlFor="provisioning_template" className="text-white">Provisioning Template *</Label>
+                                            <Select
+                                                value={formData.provisioning_template || 'company_to_pos'}
+                                                onValueChange={(value) => handleChange('provisioning_template', value)}
+                                            >
+                                                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="company_to_pos">Company to POS</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="country_template" className="text-white">Chart Template *</Label>
+                                            <Select
+                                                value={formData.country_template}
+                                                onValueChange={(value) => handleChange('country_template', value)}
+                                            >
+                                                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Kenya">Kenya</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <Label htmlFor="description" className="text-white">Description</Label>

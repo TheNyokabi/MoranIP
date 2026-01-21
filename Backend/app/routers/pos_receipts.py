@@ -38,7 +38,7 @@ async def get_receipt(
         # Get invoice data from ERPNext
         invoice_data = await pos_service._request(
             method="GET",
-            path=f"resource/Sales Invoice/{invoice_id}"
+            endpoint=f"/api/resource/Sales Invoice/{invoice_id}"
         )
 
         if not invoice_data or not invoice_data.get("data"):
@@ -115,7 +115,7 @@ async def email_receipt(
         # Get invoice data
         invoice_data = await pos_service._request(
             method="GET",
-            path=f"resource/Sales Invoice/{invoice_id}"
+            endpoint=f"/api/resource/Sales Invoice/{invoice_id}"
         )
 
         if not invoice_data or not invoice_data.get("data"):

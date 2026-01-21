@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth-store'
 import { iamApi, TenantWithMetadata } from '@/lib/api'
-import { Building2, Users, Search, Plus, Loader2, Shield, AlertCircle, Eye } from 'lucide-react'
+import { Building2, Users, Search, Plus, Loader2, Shield, AlertCircle, Eye, Warehouse } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -246,15 +246,35 @@ export default function AdminDashboard() {
                                             {new Date(tenant.created_at).toLocaleDateString()}
                                         </TableCell>
                                         <TableCell>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => router.push(`/w/${tenant.tenant_code}`)}
-                                                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                                            >
-                                                <Eye className="h-4 w-4 mr-1" />
-                                                View
-                                            </Button>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => router.push(`/w/${tenant.tenant_code}`)}
+                                                    className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                                                >
+                                                    <Eye className="h-4 w-4 mr-1" />
+                                                    View
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => router.push(`/admin/users?tenant=${tenant.id}&name=${tenant.name}`)}
+                                                    className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/10"
+                                                >
+                                                    <Users className="h-4 w-4 mr-1" />
+                                                    Users
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => router.push(`/admin/warehouse-access?tenant=${tenant.id}&name=${tenant.name}`)}
+                                                    className="text-amber-300 hover:text-amber-200 hover:bg-amber-500/10"
+                                                >
+                                                    <Warehouse className="h-4 w-4 mr-1" />
+                                                    Warehouses
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

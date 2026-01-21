@@ -25,7 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { createStockEntry } from '@/lib/api/inventory';
+import { createStockEntry, submitStockEntry, getStockEntryPosting } from '@/lib/api/inventory';
 import { getItems, getWarehouses } from '@/lib/api/inventory';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,11 +79,26 @@ export default function StockTransferPage() {
     });
 
     const createMutation = useMutation({
-        mutationFn: (data: any) => createStockEntry(data),
-        onSuccess: () => {
+        mutationFn: async (data: any) => {
+            const created = await createStockEntry(data);
+            await submitStockEntry(created.name);
+            return created;
+        },
+        onSuccess: async (created) => {
+            try {
+                const posting = await getStockEntryPosting(created.name, 50);
+                const glCount = posting?.gl_entries?.length ?? 0;
+                const sleCount = posting?.stock_ledger_entries?.length ?? 0;
+                toast({
+                    title: 'Posted',
+                    description: `Stock transfer submitted (GL ${glCount}, SLE ${sleCount}).`,
+                });
+            } catch {
+                // Non-blocking
+            }
             toast({
                 title: 'Success',
-                description: 'Stock transfer created successfully.',
+                description: 'Stock transfer created and submitted successfully.',
             });
             router.push(`/w/${tenantSlug}/inventory/stock/entries`);
         },

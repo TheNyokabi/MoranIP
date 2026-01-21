@@ -160,7 +160,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - KAFKA_BROKER=${KAFKA_BROKER}
       - REDIS_URL=redis://redis:6379/0
-      - SKIP_POS_STOCK_VALIDATION=true
+      - SKIP_POS_STOCK_VALIDATION=${SKIP_POS_STOCK_VALIDATION:-false}
     secrets:
       - postgres_password
     networks:
@@ -191,18 +191,17 @@ services:
   frontend:
     build:
       context: ./Frontend
-      target: dev
+      target: runner
     container_name: moran-frontend
     depends_on:
       api:
         condition: service_started
-    volumes:
-      - ./Frontend:/app
-      - /app/node_modules
     ports:
-      - "4000:4000"
+      - "4000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:9000
+      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
     networks:
       - moran-network
     deploy:

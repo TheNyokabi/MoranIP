@@ -1,4 +1,5 @@
 import re
+import html
 import requests
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from fastapi import HTTPException
@@ -62,6 +63,19 @@ class ERPNextClientAdapter(EngineAdapter):
                 },
                 timeout=10
             )
+
+            # In practice, ERPNext can sometimes return a "Logged In" message even when
+            # the HTTP status code isn't 200 (e.g., via intermediary/proxy quirks). Treat
+            # it as success to avoid breaking provisioning/health checks.
+            try:
+                response_data = resp.json() if resp.content else None
+                if isinstance(response_data, dict) and response_data.get("message") == "Logged In" and "exception" not in response_data:
+                    self.cookie_jar = resp.cookies
+                    self._current_tenant = site_name
+                    return True, None
+            except Exception:
+                pass
+
             if resp.status_code == 200:
                 # Check if response contains an exception (HTTP 200 but with error in body)
                 try:
@@ -95,6 +109,12 @@ class ERPNextClientAdapter(EngineAdapter):
                     error_msg = error_data["message"]
             except:
                 pass
+
+            if isinstance(error_msg, str) and error_msg.strip() == "Logged In":
+                self.cookie_jar = resp.cookies
+                self._current_tenant = site_name
+                return True, None
+
             print(f"ERPNext Login Failed for {site_name}: {error_msg}")
             return False, error_msg
         except ConnectionError as e:
@@ -155,6 +175,190 @@ class ERPNextClientAdapter(EngineAdapter):
                 cookies=self.cookie_jar,
                 timeout=30
             )
+
+            def _clean_message(msg: object) -> str:
+                if msg is None:
+                    return ""
+                if not isinstance(msg, str):
+                    msg = str(msg)
+                # ERPNext often returns HTML in `_server_messages`
+                text = html.unescape(msg)
+                text = re.sub(r"<[^>]+>", " ", text)
+                text = re.sub(r"\s+", " ", text).strip()
+                return text
+
+            def _parse_stock_shortage_message(message: str) -> Optional[Dict[str, object]]:
+                """Parse ERPNext negative stock error text into structured fields.
+
+                Variants seen in ERPNext/Frappe:
+                - '3.0 units of ITEM-001 needed in Warehouse Finished Goods - AST for Sales Invoice ACC-SINV-2026-00066 to complete this transaction.'
+                - '4.0 units of Item 100ml: Paint 100ml needed in Warehouse Finished Goods - AST on 2026-01-21 15:50:48.63 for Sales Invoice Walk-In Customer to complete this transaction.'
+                """
+                msg = _clean_message(message)
+
+                m = re.search(
+                    r"(?P<required>\d+(?:\.\d+)?)\s+units?(?:\s+of\s+(?P<item>.+?))?\s+needed in Warehouse\s+(?P<rest>.+)$",
+                    msg,
+                    flags=re.IGNORECASE,
+                )
+                if not m:
+                    return None
+
+                try:
+                    required_qty = float(m.group("required"))
+                except Exception:
+                    required_qty = None
+
+                raw_item = (m.group("item") or "").strip() or None
+                item_code = None
+                item_name = None
+                if raw_item:
+                    m_item = re.match(r"Item\s+(?P<code>[^:]+)\s*:\s*(?P<name>.+)$", raw_item, flags=re.IGNORECASE)
+                    if m_item:
+                        item_code = (m_item.group("code") or "").strip() or None
+                        item_name = (m_item.group("name") or "").strip() or None
+                    else:
+                        # Best-effort: some messages just put the item code here
+                        item_code = raw_item
+
+                rest = (m.group("rest") or "").strip()
+                rest = re.split(r"\s+to complete\b", rest, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+
+                posting_datetime = None
+                voucher_type = None
+                voucher_no = None
+                party = None
+
+                warehouse_part = rest
+                for_part = None
+
+                if " for " in rest:
+                    warehouse_part, for_part = rest.split(" for ", 1)
+                    warehouse_part = warehouse_part.strip()
+                    for_part = (for_part or "").strip()
+
+                if " on " in warehouse_part:
+                    wh, after_on = warehouse_part.split(" on ", 1)
+                    warehouse_part = wh.strip()
+                    after_on = (after_on or "").strip()
+                    if " for " in after_on and not for_part:
+                        dt, fp = after_on.split(" for ", 1)
+                        posting_datetime = dt.strip() or None
+                        for_part = fp.strip()
+                    else:
+                        posting_datetime = after_on or None
+
+                # Parse the "for ..." section if present
+                if for_part:
+                    # Sales Invoice is the common POS case (two-word doctype)
+                    if for_part.lower().startswith("sales invoice "):
+                        voucher_type = "Sales Invoice"
+                        remainder = for_part[len("Sales Invoice "):].strip()
+                        if remainder:
+                            if re.match(r"^[A-Z0-9]+-[A-Z0-9-]+$", remainder):
+                                voucher_no = remainder
+                            else:
+                                party = remainder
+                    else:
+                        # Generic fallback: last token as voucher, rest as type
+                        parts = for_part.split()
+                        if len(parts) >= 2:
+                            candidate = parts[-1]
+                            voucher_type = " ".join(parts[:-1])
+                            if re.match(r"^[A-Z0-9]+-[A-Z0-9-]+$", candidate):
+                                voucher_no = candidate
+                            else:
+                                party = candidate
+
+                warehouse = (warehouse_part or "").strip() or None
+                if not warehouse or required_qty is None:
+                    return None
+
+                return {
+                    "item": raw_item,
+                    "item_code": item_code,
+                    "item_name": item_name,
+                    "warehouse": warehouse,
+                    "required_qty": required_qty,
+                    "posting_datetime": posting_datetime,
+                    "voucher_type": voucher_type,
+                    "voucher_no": voucher_no,
+                    "party": party,
+                }
+
+            def _extract_frappe_error(detail: object) -> Dict[str, Optional[str]]:
+                """Extract a concise error message from common Frappe/ERPNext error payloads."""
+                result: Dict[str, Optional[str]] = {"message": None, "exc_type": None}
+                if not isinstance(detail, dict):
+                    result["message"] = str(detail)
+                    return result
+
+                exc_type = detail.get("exc_type") or detail.get("exception_type")
+                if isinstance(exc_type, str):
+                    result["exc_type"] = exc_type
+
+                # Prefer server messages (often contains the user-friendly error)
+                server_messages = detail.get("_server_messages")
+                if isinstance(server_messages, str) and server_messages.startswith("["):
+                    try:
+                        import json
+                        parsed = json.loads(server_messages)
+                        if isinstance(parsed, list) and parsed:
+                            # Each entry can be plain text or a JSON-stringified object
+                            first = parsed[0]
+                            if isinstance(first, str) and first.strip().startswith("{"):
+                                try:
+                                    msg_obj = json.loads(first)
+                                    if isinstance(msg_obj, dict):
+                                        msg = msg_obj.get("message") or msg_obj.get("title")
+                                        if isinstance(msg, str) and msg.strip():
+                                            result["message"] = msg
+                                            return result
+                                except Exception:
+                                    pass
+                            if isinstance(first, str) and first.strip():
+                                result["message"] = first
+                                return result
+                    except Exception:
+                        pass
+
+                # Next best: one-line exception
+                exception_line = detail.get("exception")
+                if isinstance(exception_line, str) and exception_line.strip():
+                    result["message"] = exception_line
+                    return result
+
+                # Then: explicit message field
+                msg = detail.get("message")
+                if isinstance(msg, str) and msg.strip():
+                    result["message"] = msg
+                    return result
+
+                # Fallback: traceback-ish string. Avoid returning a full traceback if possible.
+                exc = detail.get("exc")
+                if isinstance(exc, str) and exc.strip():
+                    # Sometimes `exc` is a JSON list-string containing the traceback.
+                    if exc.startswith("["):
+                        try:
+                            import json
+                            exc_list = json.loads(exc)
+                            if isinstance(exc_list, list) and exc_list:
+                                exc = exc_list[0] if isinstance(exc_list[0], str) else str(exc_list[0])
+                        except Exception:
+                            pass
+
+                    # If it contains a traceback, keep only the last non-empty line.
+                    if "Traceback" in exc:
+                        lines = [ln.strip() for ln in exc.splitlines() if ln.strip()]
+                        if lines:
+                            result["message"] = lines[-1]
+                            return result
+
+                    result["message"] = exc
+                    return result
+
+                result["message"] = "Unknown error"
+                return result
             
             # Handle authentication errors
             if resp.status_code == 401 or resp.status_code == 403:
@@ -189,9 +393,33 @@ class ERPNextClientAdapter(EngineAdapter):
             if resp.status_code == 400:
                 try:
                     error_detail = resp.json()
-                    error_msg = error_detail.get("message", "Validation error")
+                    extracted = _extract_frappe_error(error_detail)
+                    error_msg = _clean_message(extracted.get("message") or "Validation error")
                 except (ValueError, KeyError):
-                    error_msg = resp.text or "Validation error"
+                    error_msg = _clean_message(resp.text or "Validation error")
+
+                shortage = _parse_stock_shortage_message(error_msg)
+                if shortage:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "type": "insufficient_stock",
+                            "message": error_msg,
+                            "errors": [
+                                {
+                                    "item_code": shortage.get("item_code") or shortage.get("item"),
+                                    "item_name": shortage.get("item_name"),
+                                    "warehouse": shortage.get("warehouse"),
+                                    "required_qty": shortage.get("required_qty"),
+                                    "available_qty": None,
+                                    "posting_datetime": shortage.get("posting_datetime"),
+                                    "voucher_type": shortage.get("voucher_type"),
+                                    "voucher_no": shortage.get("voucher_no"),
+                                    "party": shortage.get("party"),
+                                }
+                            ],
+                        },
+                    )
                 
                 raise HTTPException(
                     status_code=400, 
@@ -231,25 +459,34 @@ class ERPNextClientAdapter(EngineAdapter):
             if resp.status_code == 417:
                 try:
                     error_detail = resp.json()
-                    # ERPNext/Frappe often returns details in `exc`/`exception` rather than `message`.
-                    error_msg = (
-                        error_detail.get("message")
-                        or error_detail.get("exc")
-                        or error_detail.get("exception")
-                        or "Expectation Failed"
-                    )
-                    # If `exc` is a JSON string list, try to unpack it to a readable message.
-                    if isinstance(error_msg, str) and error_msg.startswith("["):
-                        try:
-                            import json
-
-                            exc_list = json.loads(error_msg)
-                            if isinstance(exc_list, list) and len(exc_list) > 0:
-                                error_msg = exc_list[0] if isinstance(exc_list[0], str) else str(exc_list[0])
-                        except Exception:
-                            pass
+                    extracted = _extract_frappe_error(error_detail)
+                    error_msg = _clean_message(extracted.get("message") or "Expectation Failed")
                 except (ValueError, KeyError):
-                    error_msg = resp.text or "Expectation Failed"
+                    error_msg = _clean_message(resp.text or "Expectation Failed")
+
+                shortage = _parse_stock_shortage_message(error_msg)
+                if shortage:
+                    raise HTTPException(
+                        status_code=417,
+                        detail={
+                            "type": "insufficient_stock",
+                            "message": error_msg,
+                            "errors": [
+                                {
+                                    "item_code": shortage.get("item_code") or shortage.get("item"),
+                                    "item_name": shortage.get("item_name"),
+                                    "warehouse": shortage.get("warehouse"),
+                                    "required_qty": shortage.get("required_qty"),
+                                    "available_qty": None,
+                                    "posting_datetime": shortage.get("posting_datetime"),
+                                    "voucher_type": shortage.get("voucher_type"),
+                                    "voucher_no": shortage.get("voucher_no"),
+                                    "party": shortage.get("party"),
+                                }
+                            ],
+                            "raw_response": error_detail if 'error_detail' in locals() else None,
+                        },
+                    )
 
                 raise HTTPException(
                     status_code=417,
@@ -264,19 +501,35 @@ class ERPNextClientAdapter(EngineAdapter):
             if resp.status_code >= 400:
                 try:
                     error_detail = resp.json()
-                    # ERPNext may return error in "message" or "exc" field
-                    error_msg = error_detail.get("message") or error_detail.get("exc") or "Unknown error"
-                    # If exc is a JSON string, try to parse it
-                    if isinstance(error_msg, str) and error_msg.startswith("["):
-                        try:
-                            import json
-                            exc_list = json.loads(error_msg)
-                            if isinstance(exc_list, list) and len(exc_list) > 0:
-                                error_msg = exc_list[0] if isinstance(exc_list[0], str) else str(exc_list[0])
-                        except:
-                            pass
+                    extracted = _extract_frappe_error(error_detail)
+                    error_msg = _clean_message(extracted.get("message") or "Unknown error")
                 except (ValueError, KeyError):
-                    error_msg = resp.text or "Unknown error"
+                    error_msg = _clean_message(resp.text or "Unknown error")
+
+                shortage = _parse_stock_shortage_message(error_msg)
+                if shortage:
+                    raise HTTPException(
+                        status_code=resp.status_code,
+                        detail={
+                            "type": "insufficient_stock",
+                            "message": error_msg,
+                            "errors": [
+                                {
+                                    "item_code": shortage.get("item_code") or shortage.get("item"),
+                                    "item_name": shortage.get("item_name"),
+                                    "warehouse": shortage.get("warehouse"),
+                                    "required_qty": shortage.get("required_qty"),
+                                    "available_qty": None,
+                                    "posting_datetime": shortage.get("posting_datetime"),
+                                    "voucher_type": shortage.get("voucher_type"),
+                                    "voucher_no": shortage.get("voucher_no"),
+                                    "party": shortage.get("party"),
+                                }
+                            ],
+                            "status_code": resp.status_code,
+                            "raw_response": error_detail if 'error_detail' in locals() else None,
+                        },
+                    )
                 
                 raise HTTPException(
                     status_code=resp.status_code, 

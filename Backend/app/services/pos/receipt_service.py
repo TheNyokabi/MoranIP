@@ -26,6 +26,16 @@ class ReceiptService:
         """Initialize Receipt Service"""
         pass
 
+    def _extract_total_vat(self, invoice_data: Dict[str, Any]) -> float:
+        """Normalize total VAT value from ERPNext payloads."""
+        value = invoice_data.get("total_taxes_and_charges", 0)
+        if isinstance(value, dict):
+            return float(value.get("total", 0) or 0)
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
     def generate_thermal_receipt(
         self,
         invoice_data: Dict[str, Any],
@@ -78,7 +88,7 @@ class ReceiptService:
         # Totals
         total_qty = sum(item.get("qty", 0) for item in items)
         net_total = invoice_data.get("net_total", 0)
-        total_vat = invoice_data.get("total_taxes_and_charges", {}).get("total", 0)
+        total_vat = self._extract_total_vat(invoice_data)
         grand_total = invoice_data.get("grand_total", 0)
 
         lines.append(f"{'Total Qty:':<{(width*3)//4}}{total_qty:>{width//4}}")
@@ -205,7 +215,7 @@ class ReceiptService:
             """
 
         net_total = invoice_data.get("net_total", 0)
-        total_vat = invoice_data.get("total_taxes_and_charges", {}).get("total", 0)
+        total_vat = self._extract_total_vat(invoice_data)
         grand_total = invoice_data.get("grand_total", 0)
 
         html += f"""
@@ -338,7 +348,7 @@ class ReceiptService:
 
         # Totals
         net_total = invoice_data.get("net_total", 0)
-        total_vat = invoice_data.get("total_taxes_and_charges", {}).get("total", 0)
+        total_vat = self._extract_total_vat(invoice_data)
         grand_total = invoice_data.get("grand_total", 0)
 
         totals_style = styles['Normal']

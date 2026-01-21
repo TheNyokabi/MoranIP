@@ -431,7 +431,7 @@ class ErpnextPosService(PosServiceBase):
         Enforces one-open-session rule: Checks for existing open sessions before creating.
         Raises HTTPException(409) if active session already exists.
         """
-        # Check for existing open sessions (one-open-session rule)
+        # Check for existing open sessions (one-open-session rule per profile)
         if await self._has_open_session(profile_id):
             from fastapi import HTTPException
             raise HTTPException(
@@ -439,6 +439,20 @@ class ErpnextPosService(PosServiceBase):
                 detail={
                     "type": "pos_session_already_open",
                     "message": f"Active POS session already exists for profile {profile_id}",
+                    "profile_id": profile_id
+                }
+            )
+
+        # Enforce one-open-session rule per warehouse
+        if await self._has_open_session_for_warehouse(profile_id):
+            profile = await self.get_profile(profile_id)
+            warehouse_name = profile.get("warehouse") or "Unknown Warehouse"
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "type": "pos_session_warehouse_already_open",
+                    "message": f"Active POS session already exists for warehouse {warehouse_name}",
+                    "warehouse": warehouse_name,
                     "profile_id": profile_id
                 }
             )
@@ -465,6 +479,37 @@ class ErpnextPosService(PosServiceBase):
         try:
             sessions = await self.list_sessions(profile_id=profile_id, status="Open", limit=1)
             return len(sessions) > 0
+        except Exception:
+            return False
+
+    async def _has_open_session_for_warehouse(self, profile_id: str) -> bool:
+        """Check if there's an active open session for the profile's warehouse"""
+        try:
+            profile = await self.get_profile(profile_id)
+            warehouse = profile.get("warehouse")
+            if not warehouse:
+                return False
+
+            open_sessions = await self.list_sessions(status="Open", limit=1000)
+            if not open_sessions:
+                return False
+
+            profiles = await self.list_profiles(limit=1000)
+            profile_to_warehouse = {}
+            for item in profiles:
+                item_id = item.get("name") or item.get("id")
+                item_warehouse = item.get("warehouse")
+                if item_id and item_warehouse:
+                    profile_to_warehouse[item_id] = item_warehouse
+
+            for session in open_sessions:
+                session_profile = session.get("pos_profile")
+                if not session_profile:
+                    continue
+                if profile_to_warehouse.get(session_profile) == warehouse:
+                    return True
+
+            return False
         except Exception:
             return False
     
