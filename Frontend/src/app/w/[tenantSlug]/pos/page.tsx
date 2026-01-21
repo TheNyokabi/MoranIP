@@ -72,7 +72,7 @@ const PAYMENT_MODES = [
 export default function POSPage() {
     const params = useParams() as any
     const tenantSlug = params.tenantSlug as string
-    const { token, user, currentTenant, availableTenants, selectTenant } = useAuthStore()
+    const { token, user, isSuperAdmin, currentTenant, availableTenants, selectTenant } = useAuthStore()
 
     // Session state
     const [sessionActive, setSessionActive] = useState(false)
@@ -187,7 +187,7 @@ export default function POSPage() {
                     posApi.getPosProfiles(token).catch(() => ({ profiles: [] })), // Fetch POS profiles
                     posApi.getCustomers(token).catch(() => ({ customers: [] })), // Fetch customers
                     // For admins, include all warehouses even without POS profiles
-                    apiFetch(`/pos/warehouses${user?.isSuperAdmin ? '?include_all=true' : ''}`, {}, token).catch(() => ({ warehouses: [] }))
+                    apiFetch(`/pos/warehouses${isSuperAdmin() ? '?include_all=true' : ''}`, {}, token).catch(() => ({ warehouses: [] }))
                 ])
                 const loadedItems = (itemsRes.items || []) as POSItem[]
                 setItems(loadedItems)
@@ -196,11 +196,21 @@ export default function POSPage() {
                 const profiles = profilesRes?.profiles || []
                 setPosProfiles(profiles)
                 setCustomers(customersRes.customers || [])
+
+                // Debug: Log warehouse response
+                console.log('Warehouse API Response:', warehousesRes)
+                console.log('User object:', user)
+                console.log('Is Super Admin:', isSuperAdmin())
+
                 // Filter out group warehouses (is_group = 1) - they cannot be used for transactions
                 const warehouses = warehousesRes?.warehouses || []
+                console.log('Total warehouses received:', warehouses.length)
+
                 const transactionWarehouses = warehouses.filter(
                     (w: any) => w.is_group === 0 || w.is_group === false
                 )
+                console.log('Transaction warehouses after filtering:', transactionWarehouses.length)
+
                 setAvailableWarehouses(transactionWarehouses)
                 if (transactionWarehouses.length > 0 && !selectedWarehouse) {
                     const firstWarehouse = transactionWarehouses[0]
