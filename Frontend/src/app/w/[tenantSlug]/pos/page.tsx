@@ -186,7 +186,8 @@ export default function POSPage() {
                     posApi.getInvoices(token, 10).catch(() => ({ invoices: [] })),
                     posApi.getPosProfiles(token).catch(() => ({ profiles: [] })), // Fetch POS profiles
                     posApi.getCustomers(token).catch(() => ({ customers: [] })), // Fetch customers
-                    apiFetch('/pos/warehouses', {}, token).catch(() => ({ warehouses: [] }))
+                    // For admins, include all warehouses even without POS profiles
+                    apiFetch(`/pos/warehouses${user?.isSuperAdmin ? '?include_all=true' : ''}`, {}, token).catch(() => ({ warehouses: [] }))
                 ])
                 const loadedItems = (itemsRes.items || []) as POSItem[]
                 setItems(loadedItems)
