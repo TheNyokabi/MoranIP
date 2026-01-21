@@ -415,7 +415,11 @@ async def list_warehouses(
     Returns only warehouses with active profiles, including profile_id.
     """
     roles = current_user.get("roles", [])
-    is_pos_admin = bool(current_user.get("is_super_admin")) or any(r in roles for r in ("SUPER_ADMIN", "OWNER", "ADMIN", "MANAGER"))
+    # Check if user has admin privileges - be permissive to allow various admin role formats
+    is_pos_admin = (
+        bool(current_user.get("is_super_admin")) or 
+        any(r.upper() in ("SUPER_ADMIN", "OWNER", "ADMIN", "MANAGER") for r in (roles if isinstance(roles, list) else []))
+    )
 
     # Resolve tenant company name (for tenant/workspace scoping)
     tenant_company = None
@@ -427,6 +431,8 @@ async def list_warehouses(
         tenant_company = None
 
     if include_all and not is_pos_admin:
+        # Log for debugging
+        print(f"Access denied for include_all: user roles={roles}, is_super_admin={current_user.get('is_super_admin')}")
         raise HTTPException(status_code=403, detail="Only admin users can request include_all warehouses")
 
     # Get all POS Profiles
