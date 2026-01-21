@@ -72,7 +72,7 @@ const PAYMENT_MODES = [
 export default function POSPage() {
     const params = useParams() as any
     const tenantSlug = params.tenantSlug as string
-    const { token, currentTenant, availableTenants, selectTenant } = useAuthStore()
+    const { token, user, currentTenant, availableTenants, selectTenant } = useAuthStore()
 
     // Session state
     const [sessionActive, setSessionActive] = useState(false)
