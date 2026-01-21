@@ -6,6 +6,7 @@ from app.models.iam import Capability
 from sqlalchemy.orm import Session
 from app.database import get_db
 from typing import Any, Dict, Optional, List
+import re
 
 router = APIRouter(
     prefix="/erpnext",
@@ -299,13 +300,118 @@ def create_resource(
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Tenant access required. Please select a workspace or provide X-Tenant-ID header.")
 
-    response = erpnext_adapter.proxy_request(
-        tenant_id=tenant_id,
-        path=f"resource/{doctype}",
-        method="POST",
-        json_data=payload,
-    )
-    return ResponseNormalizer.normalize_erpnext(response)
+    def _extract_missing_links(msg: str) -> tuple[list[str], list[str]]:
+        """Extract missing Item Group and UOM names from ERPNext error text."""
+        missing_item_groups: list[str] = []
+        missing_uoms: list[str] = []
+        if not msg:
+            return missing_item_groups, missing_uoms
+
+        # Example: "Could not find Item Group: Products, Default Unit of Measure: Nos"
+        m_ig = re.findall(r"Item Group:\s*([^,]+)", msg, flags=re.IGNORECASE)
+        m_uom = re.findall(r"(?:Unit of Measure|UOM):\s*([^,]+)", msg, flags=re.IGNORECASE)
+        m_default_uom = re.findall(r"Default Unit of Measure:\s*([^,]+)", msg, flags=re.IGNORECASE)
+
+        for val in (m_ig or []):
+            name = (val or "").strip()
+            if name:
+                missing_item_groups.append(name)
+        for val in (m_uom or []) + (m_default_uom or []):
+            name = (val or "").strip()
+            if name:
+                missing_uoms.append(name)
+
+        return list(dict.fromkeys(missing_item_groups)), list(dict.fromkeys(missing_uoms))
+
+    def _ensure_uom(uom_name: str) -> bool:
+        """Ensure a UOM exists in ERPNext. Returns True if created or already existed."""
+        try:
+            erpnext_adapter.get_resource("UOM", uom_name, tenant_id)
+            return True
+        except HTTPException as e:
+            if e.status_code != 404:
+                raise
+            try:
+                erpnext_adapter.create_resource(
+                    "UOM",
+                    {
+                        "uom_name": uom_name,
+                        "must_be_whole_number": 1 if uom_name == "Nos" else 0,
+                    },
+                    tenant_id,
+                )
+                return True
+            except HTTPException as create_err:
+                if create_err.status_code == 409:
+                    return True
+                raise
+
+    def _ensure_item_group(item_group_name: str) -> bool:
+        """Ensure an Item Group exists in ERPNext. Returns True if created or already existed."""
+        try:
+            erpnext_adapter.get_resource("Item Group", item_group_name, tenant_id)
+            return True
+        except HTTPException as e:
+            if e.status_code != 404:
+                raise
+            try:
+                erpnext_adapter.create_resource(
+                    "Item Group",
+                    {
+                        "item_group_name": item_group_name,
+                        "parent_item_group": "All Item Groups",
+                        "is_group": 0,
+                    },
+                    tenant_id,
+                )
+                return True
+            except HTTPException as create_err:
+                if create_err.status_code == 409:
+                    return True
+                raise
+
+    try:
+        response = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/{doctype}",
+            method="POST",
+            json_data=payload,
+        )
+        return ResponseNormalizer.normalize_erpnext(response)
+    except HTTPException as e:
+        # Self-heal common ERPNext defaults for Item creation.
+        if doctype == "Item" and e.status_code == 417:
+            detail = e.detail
+            msg = ""
+            if isinstance(detail, dict):
+                msg = str(detail.get("message") or "")
+            elif isinstance(detail, str):
+                msg = detail
+
+            missing_item_groups, missing_uoms = _extract_missing_links(msg)
+
+            # Only auto-create a small, known-safe set of defaults.
+            allowed_item_groups = {"Products"}
+            allowed_uoms = {"Nos"}
+
+            created_any = False
+            for ig in missing_item_groups:
+                if ig in allowed_item_groups:
+                    created_any = _ensure_item_group(ig) or created_any
+            for uom in missing_uoms:
+                if uom in allowed_uoms:
+                    created_any = _ensure_uom(uom) or created_any
+
+            if created_any:
+                response = erpnext_adapter.proxy_request(
+                    tenant_id=tenant_id,
+                    path=f"resource/{doctype}",
+                    method="POST",
+                    json_data=payload,
+                )
+                return ResponseNormalizer.normalize_erpnext(response)
+
+        raise
 
 
 @router.get("/resource/{doctype}/{name}")

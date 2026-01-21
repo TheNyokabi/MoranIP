@@ -30,6 +30,7 @@ import {
     Package,
 } from 'lucide-react';
 import { ProvisioningStatus } from '@/components/provisioning/ProvisioningStatus';
+import { useAuthStore } from '@/store/auth-store';
 
 interface CreateWorkspaceFormData {
     name: string;
@@ -88,7 +89,6 @@ export default function CreateWorkspacePage() {
 
         try {
             const { iamApi } = await import('@/lib/api');
-            const { useAuthStore } = await import('@/store/auth-store');
             const token = useAuthStore.getState().token;
 
             const data = await iamApi.createTenant({

@@ -211,7 +211,232 @@ async def delete_item(
     return {"message": "Item disabled successfully"}
 
 
+# ==================== Item Group Endpoints ====================
+
+class ItemGroupCreate(BaseModel):
+    item_group_name: str = Field(..., min_length=1, description="Name of the item group")
+    parent_item_group: Optional[str] = Field(None, description="Parent item group (for hierarchical structure)")
+    is_group: int = Field(0, description="1 if this is a group (can have children), 0 if leaf node")
+
+
+class ItemGroupUpdate(BaseModel):
+    item_group_name: Optional[str] = None
+    parent_item_group: Optional[str] = None
+    is_group: Optional[int] = None
+
+
+@router.get("/item-groups")
+async def list_item_groups(
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user)
+):
+    """List all item groups with hierarchical structure."""
+    import json
+    
+    # Fetch all item groups
+    result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Item Group",
+        method="GET",
+        params={
+            "limit_page_length": 500,
+            "fields": json.dumps(["name", "item_group_name", "parent_item_group", "is_group", "lft", "rgt"])
+        }
+    )
+    
+    item_groups = result.get("data", []) if isinstance(result, dict) else []
+    
+    # Build hierarchical structure
+    def build_tree(items: List[Dict], parent: Optional[str] = None) -> List[Dict]:
+        """Recursively build tree structure"""
+        tree = []
+        for item in items:
+            if item.get("parent_item_group") == parent:
+                children = build_tree(items, item.get("name"))
+                node = {
+                    "name": item.get("name"),
+                    "item_group_name": item.get("item_group_name"),
+                    "parent_item_group": item.get("parent_item_group"),
+                    "is_group": item.get("is_group"),
+                    "children": children if children else []
+                }
+                tree.append(node)
+        return tree
+    
+    # Build tree starting from root (items with no parent or parent = "")
+    hierarchical_data = build_tree(item_groups, None)
+    
+    # Also return flat list for convenience
+    return {
+        "data": item_groups,
+        "hierarchical": hierarchical_data
+    }
+
+
+@router.post("/item-groups")
+async def create_item_group(
+    item_group: ItemGroupCreate,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new item group."""
+    # Validate parent exists if specified
+    if item_group.parent_item_group:
+        try:
+            from urllib.parse import quote
+            erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path=f"resource/Item Group/{quote(item_group.parent_item_group)}",
+                method="GET"
+            )
+        except HTTPException as e:
+            if e.status_code == 404:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": "parent_not_found",
+                        "message": f"Parent item group '{item_group.parent_item_group}' does not exist."
+                    }
+                )
+            raise
+    
+    result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Item Group",
+        method="POST",
+        json_data=item_group.model_dump()
+    )
+    return ResponseNormalizer.normalize_erpnext(result)
+
+
+@router.get("/item-groups/{name}")
+async def get_item_group(
+    name: str,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get details of a specific item group."""
+    from urllib.parse import quote
+    
+    result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path=f"resource/Item Group/{quote(name)}",
+        method="GET"
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Item group not found")
+    
+    return ResponseNormalizer.normalize_erpnext(result)
+
+
+@router.put("/item-groups/{name}")
+async def update_item_group(
+    name: str,
+    updates: ItemGroupUpdate,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user)
+):
+    """Update an existing item group."""
+    from urllib.parse import quote
+    
+    # Filter out None values
+    update_data = {k: v for k, v in updates.model_dump().items() if v is not None}
+    
+    # Validate parent exists if being updated
+    if "parent_item_group" in update_data and update_data["parent_item_group"]:
+        try:
+            erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path=f"resource/Item Group/{quote(update_data['parent_item_group'])}",
+                method="GET"
+            )
+        except HTTPException as e:
+            if e.status_code == 404:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "type": "parent_not_found",
+                        "message": f"Parent item group '{update_data['parent_item_group']}' does not exist."
+                    }
+                )
+            raise
+    
+    result = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path=f"resource/Item Group/{quote(name)}",
+        method="PUT",
+        json_data=update_data
+    )
+    return ResponseNormalizer.normalize_erpnext(result)
+
+
+@router.delete("/item-groups/{name}")
+async def delete_item_group(
+    name: str,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an item group. Only allowed if no items are using it."""
+    from urllib.parse import quote
+    import json
+    
+    # Check if any items are using this group
+    items_check = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Item",
+        method="GET",
+        params={
+            "filters": json.dumps([["item_group", "=", name]]),
+            "limit_page_length": 1,
+            "fields": json.dumps(["item_code"])
+        }
+    )
+    
+    items = items_check.get("data", []) if isinstance(items_check, dict) else []
+    if items:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "item_group_in_use",
+                "message": f"Cannot delete item group '{name}' because it is being used by items. Please reassign or delete those items first."
+            }
+        )
+    
+    # Check if any child item groups exist
+    children_check = erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path="resource/Item Group",
+        method="GET",
+        params={
+            "filters": json.dumps([["parent_item_group", "=", name]]),
+            "limit_page_length": 1,
+            "fields": json.dumps(["name"])
+        }
+    )
+    
+    children = children_check.get("data", []) if isinstance(children_check, dict) else []
+    if children:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "has_children",
+                "message": f"Cannot delete item group '{name}' because it has child groups. Please delete or reassign child groups first."
+            }
+        )
+    
+    # Delete the item group
+    erpnext_adapter.proxy_request(
+        tenant_id=tenant_id,
+        path=f"resource/Item Group/{quote(name)}",
+        method="DELETE"
+    )
+    
+    return {"message": f"Item group '{name}' deleted successfully"}
+
+
 # ==================== Warehouse Endpoints ====================
+
 
 @router.get("/warehouses")
 async def list_warehouses(

@@ -87,6 +87,7 @@ export default function InventoryPage() {
     const transactionWarehouses = warehouses.filter((warehouse) => !isGroupWarehouse(warehouse));
     const selectableWarehouses = transactionWarehouses.length ? transactionWarehouses : warehouses;
     const [warehouseTypes, setWarehouseTypes] = useState<string[]>([]);
+    const [itemGroups, setItemGroups] = useState<Array<{ name: string; item_group_name: string; is_group: number }>>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [showLowStockOnly, setShowLowStockOnly] = useState(false);
@@ -144,11 +145,12 @@ export default function InventoryPage() {
         };
     }, [token, tenantId, tenantSlug, user?.isSuperAdmin]);
 
+
     const fetchData = async () => {
         if (!token) return;
         setLoading(true);
         try {
-            const [itemsResponse, warehousesResponse, stockEntriesResponse, stockSettingsResponse, stockAccountResponse, warehouseTypesResponse] = await Promise.all([
+            const [itemsResponse, warehousesResponse, stockEntriesResponse, stockSettingsResponse, stockAccountResponse, warehouseTypesResponse, itemGroupsResponse] = await Promise.all([
                 erpNextApi.listResource<InventoryItem>(token, "Item", {
                     limit: "100",
                     fields: JSON.stringify(["item_code", "item_name", "item_group", "stock_uom", "standard_rate", "valuation_rate", "description", "brand"])
@@ -168,7 +170,8 @@ export default function InventoryPage() {
                     return null;
                 }),
                 apiFetch<{ account: string | null }>("/api/inventory/stock-asset-account", {}, token).catch(() => ({ account: null })),
-                apiFetch<{ warehouse_types: string[] }>("/api/inventory/warehouse-types", {}, token).catch(() => ({ warehouse_types: [] }))
+                apiFetch<{ warehouse_types: string[] }>("/api/inventory/warehouse-types", {}, token).catch(() => ({ warehouse_types: [] })),
+                apiFetch<{ data: Array<{ name: string; item_group_name: string; is_group: number }> }>("/api/inventory/item-groups", {}, token).catch(() => ({ data: [] }))
             ]);
 
             // Handle different response structures
@@ -182,6 +185,7 @@ export default function InventoryPage() {
             setDefaultWarehouse(stockSettingsResponse?.data?.default_warehouse || null);
             setStockAccountSuggestion(stockAccountResponse?.account || null);
             setWarehouseTypes(warehouseTypesResponse?.warehouse_types || []);
+            setItemGroups(itemGroupsResponse?.data || []);
 
             // Fetch stock levels for each item across all warehouses
             const levels: Record<string, number> = {};
@@ -1199,12 +1203,21 @@ export default function InventoryPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-foreground">Item Group</label>
-                                    <Input
-                                        className="bg-card dark:bg-white/5 border-border dark:border-white/10 text-foreground placeholder:text-muted-foreground"
-                                        value={editingItem.item_group}
+                                    <select
+                                        className="w-full px-3 py-2 bg-card dark:bg-white/5 border border-border dark:border-white/10 rounded-lg text-foreground"
+                                        value={editingItem.item_group || ""}
                                         onChange={e => setEditingItem({ ...editingItem, item_group: e.target.value })}
                                         data-testid="inventory-item-group"
-                                    />
+                                    >
+                                        <option value="">Select Item Group</option>
+                                        {itemGroups
+                                            .filter(g => g.is_group === 0) // Only show leaf nodes (not groups)
+                                            .map(group => (
+                                                <option key={group.name} value={group.name}>
+                                                    {group.item_group_name}
+                                                </option>
+                                            ))}
+                                    </select>
                                 </div>
                             </div>
 

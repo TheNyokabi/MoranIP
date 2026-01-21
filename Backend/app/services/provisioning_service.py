@@ -789,65 +789,73 @@ class ProvisioningService:
                             raise
 
             # ---- Ensure Item Group(s) ----
-            # First, ensure the root "All Item Groups" exists
-            try:
-                erpnext_adapter.get_resource("Item Group", "All Item Groups", tenant_id)
-            except HTTPException as e:
-                if e.status_code == 404:
-                    try:
-                        erpnext_adapter.create_resource(
-                            "Item Group",
-                            {
-                                "item_group_name": "All Item Groups",
-                                "is_group": 1,  # This is a group
-                            },
-                            tenant_id,
-                        )
-                        logger.info(f"[{correlation_id}] Created root ERPNext Item Group: All Item Groups")
-                    except HTTPException as create_err:
-                        if create_err.status_code != 409:
-                            logger.warning(f"[{correlation_id}] Failed to create 'All Item Groups': {create_err}")
-                elif e.status_code != 409:
-                    raise
-            
-            # Now create child item groups
-            required_item_groups = [
-                {
-                    "name": "Products",
-                    "parent": "All Item Groups",
-                    "is_group": 0,
-                }
+            # Define comprehensive item group hierarchy
+            # This creates a standard structure suitable for most businesses
+            common_item_groups = [
+                # Root group (must be created first)
+                {"name": "All Item Groups", "parent": None, "is_group": 1},
+                
+                # Top-level categories
+                {"name": "Products", "parent": "All Item Groups", "is_group": 1},
+                {"name": "Services", "parent": "All Item Groups", "is_group": 1},
+                {"name": "Raw Materials", "parent": "All Item Groups", "is_group": 1},
+                
+                # Product subcategories
+                {"name": "Consumables", "parent": "Products", "is_group": 0},
+                {"name": "Sub Assemblies", "parent": "Products", "is_group": 0},
+                {"name": "Finished Goods", "parent": "Products", "is_group": 0},
+                
+                # Service subcategories
+                {"name": "Consulting", "parent": "Services", "is_group": 0},
+                {"name": "Installation", "parent": "Services", "is_group": 0},
+                {"name": "Maintenance", "parent": "Services", "is_group": 0},
             ]
-
-            for ig in required_item_groups:
+            
+            # Create item groups in order (parents before children)
+            for ig in common_item_groups:
                 ig_name = ig["name"]
                 try:
                     erpnext_adapter.get_resource("Item Group", ig_name, tenant_id)
+                    logger.debug(f"[{correlation_id}] Item Group '{ig_name}' already exists")
                 except HTTPException as e:
                     if e.status_code != 404:
                         raise
+                    
+                    # Build payload for creation
                     payload = {
                         "item_group_name": ig_name,
                         "is_group": ig.get("is_group", 0),
-                        "parent_item_group": ig.get("parent") or "All Item Groups",
                     }
+                    
+                    # Add parent if specified
+                    if ig.get("parent"):
+                        payload["parent_item_group"] = ig["parent"]
+                    
                     try:
                         erpnext_adapter.create_resource("Item Group", payload, tenant_id)
-                        logger.info(f"[{correlation_id}] Created missing ERPNext Item Group: {ig_name}")
+                        logger.info(f"[{correlation_id}] Created ERPNext Item Group: {ig_name}")
                     except HTTPException as create_err:
                         if create_err.status_code == 409:
+                            logger.debug(f"[{correlation_id}] Item Group '{ig_name}' already exists (409)")
                             continue
-                        # Some ERPNext setups may reject parent linkage if the parent differs.
-                        # Retry without parent to keep provisioning resilient.
-                        try:
-                            erpnext_adapter.create_resource(
-                                "Item Group",
-                                {"item_group_name": ig_name, "is_group": ig.get("is_group", 0)},
-                                tenant_id,
-                            )
-                        except HTTPException as retry_err:
-                            if retry_err.status_code != 409:
-                                raise
+                        
+                        # If parent linkage fails, try without parent for resilience
+                        if ig.get("parent"):
+                            logger.warning(f"[{correlation_id}] Failed to create '{ig_name}' with parent, retrying without parent")
+                            try:
+                                erpnext_adapter.create_resource(
+                                    "Item Group",
+                                    {"item_group_name": ig_name, "is_group": ig.get("is_group", 0)},
+                                    tenant_id,
+                                )
+                                logger.info(f"[{correlation_id}] Created ERPNext Item Group (no parent): {ig_name}")
+                            except HTTPException as retry_err:
+                                if retry_err.status_code != 409:
+                                    logger.error(f"[{correlation_id}] Failed to create Item Group '{ig_name}': {retry_err}")
+                                    raise
+                        else:
+                            raise
+
 
             return StepResult(
                 step_name="step_1_platform_setup",
