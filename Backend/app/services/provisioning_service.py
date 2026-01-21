@@ -736,18 +736,135 @@ class ProvisioningService:
         onboarding: TenantOnboarding,
         correlation_id: str
     ) -> StepResult:
-        """Step 1: Platform Setup (placeholder for future platform-specific setup)"""
+        """Step 1: Platform Setup.
+
+        This step is intended for lightweight, idempotent platform defaults.
+
+        For ERPNext, we ensure a small set of required master data exists so
+        subsequent user actions (like creating Items from the UI) don't fail
+        with LinkValidationError due to missing references.
+        """
         start_time = time.time()
-        
-        # This step is currently a no-op but reserved for future platform setup
-        # (e.g., creating system users, setting up default roles, etc.)
-        
-        return StepResult(
-            step_name="step_1_platform_setup",
-            status="completed",
-            message="Platform setup completed",
-            duration_ms=(time.time() - start_time) * 1000
-        )
+
+        try:
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+            if not tenant:
+                return StepResult(
+                    step_name="step_1_platform_setup",
+                    status="failed",
+                    message="Platform setup failed: tenant not found",
+                    error="Tenant not found",
+                    duration_ms=(time.time() - start_time) * 1000,
+                )
+
+            # Only apply ERPNext-specific defaults for ERPNext tenants.
+            if getattr(tenant, "engine", None) != "erpnext":
+                return StepResult(
+                    step_name="step_1_platform_setup",
+                    status="completed",
+                    message="Platform setup completed",
+                    duration_ms=(time.time() - start_time) * 1000,
+                )
+
+            # ---- Ensure UOMs ----
+            required_uoms = ["Nos", "Kg", "Liter", "Milliliter"]
+            for uom_name in required_uoms:
+                try:
+                    erpnext_adapter.get_resource("UOM", uom_name, tenant_id)
+                except HTTPException as e:
+                    if e.status_code != 404:
+                        raise
+                    try:
+                        erpnext_adapter.create_resource(
+                            "UOM",
+                            {
+                                "uom_name": uom_name,
+                                "must_be_whole_number": 1 if uom_name == "Nos" else 0,
+                            },
+                            tenant_id,
+                        )
+                        logger.info(f"[{correlation_id}] Created missing ERPNext UOM: {uom_name}")
+                    except HTTPException as create_err:
+                        if create_err.status_code != 409:
+                            raise
+
+            # ---- Ensure Item Group(s) ----
+            # First, ensure the root "All Item Groups" exists
+            try:
+                erpnext_adapter.get_resource("Item Group", "All Item Groups", tenant_id)
+            except HTTPException as e:
+                if e.status_code == 404:
+                    try:
+                        erpnext_adapter.create_resource(
+                            "Item Group",
+                            {
+                                "item_group_name": "All Item Groups",
+                                "is_group": 1,  # This is a group
+                            },
+                            tenant_id,
+                        )
+                        logger.info(f"[{correlation_id}] Created root ERPNext Item Group: All Item Groups")
+                    except HTTPException as create_err:
+                        if create_err.status_code != 409:
+                            logger.warning(f"[{correlation_id}] Failed to create 'All Item Groups': {create_err}")
+                elif e.status_code != 409:
+                    raise
+            
+            # Now create child item groups
+            required_item_groups = [
+                {
+                    "name": "Products",
+                    "parent": "All Item Groups",
+                    "is_group": 0,
+                }
+            ]
+
+            for ig in required_item_groups:
+                ig_name = ig["name"]
+                try:
+                    erpnext_adapter.get_resource("Item Group", ig_name, tenant_id)
+                except HTTPException as e:
+                    if e.status_code != 404:
+                        raise
+                    payload = {
+                        "item_group_name": ig_name,
+                        "is_group": ig.get("is_group", 0),
+                        "parent_item_group": ig.get("parent") or "All Item Groups",
+                    }
+                    try:
+                        erpnext_adapter.create_resource("Item Group", payload, tenant_id)
+                        logger.info(f"[{correlation_id}] Created missing ERPNext Item Group: {ig_name}")
+                    except HTTPException as create_err:
+                        if create_err.status_code == 409:
+                            continue
+                        # Some ERPNext setups may reject parent linkage if the parent differs.
+                        # Retry without parent to keep provisioning resilient.
+                        try:
+                            erpnext_adapter.create_resource(
+                                "Item Group",
+                                {"item_group_name": ig_name, "is_group": ig.get("is_group", 0)},
+                                tenant_id,
+                            )
+                        except HTTPException as retry_err:
+                            if retry_err.status_code != 409:
+                                raise
+
+            return StepResult(
+                step_name="step_1_platform_setup",
+                status="completed",
+                message="Platform setup completed",
+                duration_ms=(time.time() - start_time) * 1000,
+            )
+        except Exception as e:
+            error_type, error_msg = _parse_erpnext_error(e, correlation_id)
+            logger.error(f"[{correlation_id}] Platform setup failed: {error_type} - {error_msg}")
+            return StepResult(
+                step_name="step_1_platform_setup",
+                status="failed",
+                message=f"Platform setup failed: {error_msg}",
+                error=error_msg,
+                duration_ms=(time.time() - start_time) * 1000,
+            )
     
     def _step_company(
         self,
