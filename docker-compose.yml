@@ -1,291 +1,26 @@
 services:
   # ==========================================
-  # PLATFORM SERVICES (CORE)
+  # POSTGRES
   # ==========================================
-
-  # Odoo ERP Engine
-  odoo:
-    build: ./Engine
-    container_name: moran-odoo
-    depends_on:
-      postgres:
-        condition: service_healthy
-      init-postgres:
-        condition: service_completed_successfully
-      init-kafka:
-        condition: service_completed_successfully
-    ports:
-      - "9069:8069"
-    volumes:
-      - odoo_data:/var/lib/odoo
-      - ./Engine/addons:/mnt/extra-addons
-    environment:
-      - HOST=postgres
-      - USER=odoo
-      # PASSWORD injected via entrypoint_wrapper from secrets
-    secrets:
-      - postgres_password
-      - odoo_password
-    networks:
-      - moran-network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-      restart_policy:
-        condition: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.odoo.rule=Host(`odoo.localhost`)"
-      - "traefik.http.routers.odoo.entrypoints=web"
-      - "traefik.http.services.odoo.loadbalancer.server.port=8069"
-
-  # ERPNext DB (MariaDB)
-  mariadb:
-    image: mariadb:10.6
-    container_name: moran-mariadb
-    environment:
-      MYSQL_ROOT_PASSWORD: admin
-      MYSQL_DATABASE: extra_db # Initial placeholder
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --wait_timeout=28800
-      - --log-bin-trust-function-creators=1
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    networks:
-      - moran-network
-    healthcheck:
-      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
-      interval: 10s
-      retries: 5
-
-  # ERPNext Backend (Local Build)
-  erpnext:
-    build: ./Engine/ERPNext
-    platform: linux/amd64
-    container_name: moran-erpnext-local
-    deploy:
-      restart_policy:
-        condition: on-failure
-    environment:
-      DB_HOST: mariadb
-      DB_PORT: 3306
-      REDIS_CACHE: redis:6379
-      REDIS_QUEUE: redis:6379
-      REDIS_SOCKETIO: redis:6379
-      SOCKETIO_PORT: 9000
-    volumes:
-      - ./Engine/ERPNext/frappe:/app/frappe
-      - ./Engine/ERPNext/erpnext:/app/erpnext
-      - ./Engine/ERPNext/addons:/app/custom-apps
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
-    ports:
-      - "9010:8000"
-    networks:
-      - moran-network
-    depends_on:
-      mariadb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  # Site Creator (One-off)
-  create-site:
-    image: frappe/erpnext:v15.20.0
-    platform: linux/amd64
-    container_name: moran-site-creator
-    deploy:
-      restart_policy:
-        condition: on-failure
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
-    environment:
-      DB_HOST: mariadb
-      DB_PORT: 3306
-      REDIS_CACHE: redis:6379
-      REDIS_QUEUE: redis:6379
-      REDIS_SOCKETIO: redis:6379
-    networks:
-      - moran-network
-    depends_on:
-      erpnext:
-        condition: service_started
-    entrypoint:
-      - bash
-      - -c
-    command:
-      - >
-        echo "Waiting for ERPNext..." && sleep 10 && echo '{"db_host": "mariadb", "db_port": 3306, "redis_cache": "redis://redis:6379", "redis_queue": "redis://redis:6379", "redis_socketio": "redis://redis:6379"}' > sites/common_site_config.json && if [ ! -d "sites/moran.localhost" ]; then
-          echo "Creating site moran.localhost..." &&
-          bench new-site moran.localhost \
-            --no-mariadb-socket \
-            --admin-password admin \
-            --db-root-password admin \
-            --install-app erpnext \
-            --set-default;
-        else
-          echo "Site exists.";
-        fi && echo "Site creation complete. Access via http://localhost:9010"
-
-  # API Gateway (FastAPI)
-  api:
-    build: ./Backend
-    container_name: moran-api
-    depends_on:
-      postgres:
-        condition: service_healthy
-      init-postgres:
-        condition: service_completed_successfully
-      kafka:
-        condition: service_healthy
-    ports:
-      - "9000:8000"
-    volumes:
-      - ./Backend:/app
-    environment:
-      - API_ENV=${API_ENV}
-      - SECRET_KEY=${SECRET_KEY}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - KAFKA_BROKER=${KAFKA_BROKER}
-      - REDIS_URL=redis://redis:6379/0
-      - SKIP_POS_STOCK_VALIDATION=${SKIP_POS_STOCK_VALIDATION:-false}
-    secrets:
-      - postgres_password
-    networks:
-      - moran-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-      restart_policy:
-        condition: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
-      - "traefik.http.routers.api.entrypoints=web"
-      - "traefik.http.services.api.loadbalancer.server.port=8000"
-
-  # Frontend (Next.js)
-  frontend:
-    build:
-      context: ./Frontend
-      target: runner
-    container_name: moran-frontend
-    depends_on:
-      api:
-        condition: service_started
-    ports:
-      - "4000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
-      - NODE_ENV=production
-      - NEXT_TELEMETRY_DISABLED=1
-    networks:
-      - moran-network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-      restart_policy:
-        condition: on-failure
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`app.localhost`)"
-      - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
-
-  # ==========================================
-  # INFRASTRUCTURE SERVICES
-  # ==========================================
-
-  # PostgreSQL Database
   postgres:
     image: postgres:15
     container_name: moran-postgres
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
-    secrets:
-      - postgres_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pg_data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    networks:
-      - moran-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U moran -d moran_db"]
       interval: 10s
-      timeout: 5s
       retries: 5
-
-  # Init Containers (Wait for dependencies)
-  init-postgres:
-    image: alpine:latest
-    container_name: init-postgres
-    command: [ "sh", "-c", "apk add --no-cache netcat-openbsd && until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done;" ]
-    depends_on:
-      postgres:
-        condition: service_started
     networks:
       - moran-network
 
-  init-kafka:
-    image: alpine:latest
-    container_name: init-kafka
-    command: [ "sh", "-c", "apk add --no-cache netcat-openbsd && until nc -z kafka 9092; do echo waiting for kafka; sleep 2; done;" ]
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - moran-network
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: moran-redis
-    ports:
-      - "6379:6379"
-    networks:
-      - moran-network
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  # Kafka
+  # ==========================================
+  # KAFKA (FIXED KRaft)
+  # ==========================================
   kafka:
     image: apache/kafka:3.7.0
     container_name: moran-kafka
@@ -297,119 +32,124 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_NUM_PARTITIONS: 3
-    volumes:
-      - kafka_data:/var/lib/kafka/data
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo > /dev/tcp/localhost/9092"]
+      interval: 15s
+      retries: 10
     networks:
       - moran-network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    healthcheck:
-      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # ==========================================
-  # TEST AUTOMATION
+  # API
   # ==========================================
-  qa:
-    build: ./QATests
-    container_name: moran-qa
+  api:
+    build: ./Backend
+    container_name: moran-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "9000:8000"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BROKER: kafka:9092
+    networks:
+      - moran-network
+
+  # ==========================================
+  # FRONTEND
+  # ==========================================
+  frontend:
+    build:
+      context: ./Frontend
+      target: dev
+    container_name: moran-frontend
     depends_on:
       api:
         condition: service_started
-      frontend:
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./Frontend:/app
+      - /app/node_modules
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8000
+    networks:
+      - moran-network
+
+  # ==========================================
+  # REDIS
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: moran-redis
+    networks:
+      - moran-network
+
+  # ==========================================
+  # MARIADB
+  # ==========================================
+  mariadb:
+    image: mariadb:10.6
+    container_name: moran-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: extra_db
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - moran-network
+
+  # ==========================================
+  # ERPNext
+  # ==========================================
+  erpnext:
+    image: frappe/erpnext:v15.20.0
+    platform: linux/amd64
+    container_name: moran-erpnext
+    depends_on:
+      mariadb:
         condition: service_started
-    networks:
-      - moran-network
-    environment:
-      - API_URL=http://api:8000
-      - FRONTEND_URL=http://frontend:4000
+      redis:
+        condition: service_started
+    ports:
+      - "9010:8000"
     volumes:
-      - ./QATests/results:/opt/robotframework/results
-      - ./QATests/tests:/opt/robotframework/tests # Mount tests for easier dev
-      - ./QATests/resources:/opt/robotframework/resources # Mount resources for easier dev
-    # entrypoint: ["tail", "-f", "/dev/null"] # Manual run
-    profiles: [ "test" ] # Only start when requested
+      - sites:/home/frappe/frappe-bench/sites
+      - logs:/home/frappe/frappe-bench/logs
+    networks:
+      - moran-network
 
-  # ==========================================
-  # TOOLING & MONITORING
-  # ==========================================
-
-  traefik:
-    image: traefik:v2.10
-    container_name: moran-traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-    ports:
-      - "80:80"
-      - "8080:8080"
+  create-site:
+    image: frappe/erpnext:v15.20.0
+    platform: linux/amd64
+    container_name: moran-site-creator
+    depends_on:
+      erpnext:
+        condition: service_started
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      sleep 20
+      echo '{"db_host":"mariadb","db_port":3306}' > sites/common_site_config.json
+      if [ ! -d "sites/moran.localhost" ]; then
+        bench new-site moran.localhost \
+          --admin-password admin \
+          --db-root-password admin \
+          --install-app erpnext \
+          --set-default
+      fi
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    networks:
-      - moran-network
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: moran-kafka-ui
-    ports:
-      - "9080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-    networks:
-      - moran-network
-
-  mailpit:
-    image: axllent/mailpit
-    container_name: moran-mailpit
-    ports:
-      - "8025:8025"
-      - "1025:1025"
-    networks:
-      - moran-network
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: moran-prometheus
-    volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9091:9090"
-    networks:
-      - moran-network
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: moran-grafana
-    ports:
-      - "9001:3000"
-    networks:
-      - moran-network
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: moran-cadvisor
-    ports:
-      - "8081:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
+      - sites:/home/frappe/frappe-bench/sites
+      - logs:/home/frappe/frappe-bench/logs
     networks:
       - moran-network
 
@@ -418,16 +158,7 @@ networks:
     driver: bridge
 
 volumes:
-  odoo_data:
   pg_data:
-  kafka_data:
   mariadb_data:
   sites:
   logs:
-
-
-secrets:
-  postgres_password:
-    file: ./secrets/postgres_password.txt
-  odoo_password:
-    file: ./secrets/odoo_password.txt
