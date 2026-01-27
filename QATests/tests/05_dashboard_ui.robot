@@ -22,9 +22,8 @@ Verify Recent Dashboard Changes
     Fill Text      css=[data-testid="login-password"]    ${ADMIN_PASS}
     Click          css=[data-testid="login-submit"]
     
-    # Verify Redirect to Dashboard and workspace list is present
     Get Url        contains    /dashboard
     Wait For Elements State    css=[data-testid="workspace-search"]    visible    timeout=30s
-    Wait For Elements State    css=[data-testid="workspace-card"]      visible    timeout=30s
+    Wait For Elements State    css=[data-testid="workspace-card"] >> nth=0      visible    timeout=30s
 
     [Teardown]    Close Browser

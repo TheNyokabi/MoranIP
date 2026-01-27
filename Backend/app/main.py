@@ -6,7 +6,7 @@ from .middleware.pos_cache_middleware import POSCacheMiddleware, CacheInvalidati
 from .services.cache.pos_cache import POSCacheService
 
 # Import all models to ensure SQLAlchemy relationships are properly initialized
-from .models.iam import Tenant, TenantSettings, TenantSecuritySettings, TenantNotificationSettings  # noqa: F401
+from .models.iam import Tenant, TenantSettings  # noqa: F401
 from .models.rbac import Role, Permission, UserRole  # noqa: F401
 from .models.pos_warehouse_access import WarehouseAccessRole, WarehouseAccessUser  # noqa: F401
 from .models.onboarding import TenantOnboarding, Contact  # noqa: F401
@@ -55,14 +55,25 @@ app.include_router(odoo.router)
 app.include_router(erpnext.router)
 app.include_router(erp.router)
 app.include_router(pos.router, prefix="/api/pos")
-app.include_router(inventory.router, prefix="/api")
-app.include_router(purchases.router)
-app.include_router(accounting.router, prefix="/api")
-app.include_router(crm.router, prefix="/api")
-app.include_router(hr.router, prefix="/api")
-app.include_router(paint.router, prefix="/api")
-app.include_router(manufacturing.router, prefix="/api")
-app.include_router(projects.router, prefix="/api")
+app.include_router(inventory.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(purchases.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(accounting.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(crm.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(hr.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(paint.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(manufacturing.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(projects.router, prefix="/api/tenants/{tenant_id}/erp")
+
+# Compatibility prefixes for calls lacking tenant_id in URL (resolves via token/header)
+app.include_router(inventory.router, prefix="/api", tags=["Compatibility"])
+app.include_router(purchases.router, prefix="/api", tags=["Compatibility"])
+app.include_router(accounting.router, prefix="/api", tags=["Compatibility"])
+app.include_router(crm.router, prefix="/api", tags=["Compatibility"])
+app.include_router(hr.router, prefix="/api", tags=["Compatibility"])
+app.include_router(paint.router, prefix="/api", tags=["Compatibility"])
+app.include_router(manufacturing.router, prefix="/api", tags=["Compatibility"])
+app.include_router(projects.router, prefix="/api", tags=["Compatibility"])
+
 from app.routers import sales, support, assets, quality
 app.include_router(sales.router, prefix="/api")
 app.include_router(support.router, prefix="/api")
@@ -96,6 +107,12 @@ app.include_router(reports.router, prefix="/api/tenants/{tenant_id}")
 app.include_router(commissions.router, prefix="/api/tenants/{tenant_id}")
 app.include_router(dashboard.router, prefix="/api/tenants/{tenant_id}")
 app.include_router(files.router, prefix="/api/tenants/{tenant_id}")
+
+# Phase 5 fallbacks
+app.include_router(reports.router, prefix="/api", tags=["Compatibility"])
+app.include_router(commissions.router, prefix="/api", tags=["Compatibility"])
+app.include_router(dashboard.router, prefix="/api", tags=["Compatibility"])
+app.include_router(files.router, prefix="/api", tags=["Compatibility"])
 app.include_router(notifications.router, prefix="/api")
 
 @app.on_event("startup")

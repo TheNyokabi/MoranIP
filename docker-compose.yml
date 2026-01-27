@@ -197,7 +197,7 @@ services:
       api:
         condition: service_started
     ports:
-      - "4000:3000"
+      - "4000:4000"
     environment:
       - NEXT_PUBLIC_API_URL=http://api:8000
       - NODE_ENV=production
@@ -214,7 +214,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`app.localhost`)"
       - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.http.services.frontend.loadbalancer.server.port=4000"
 
   # ==========================================
   # INFRASTRUCTURE SERVICES
@@ -338,6 +338,7 @@ services:
       - ./QATests/results:/opt/robotframework/results
       - ./QATests/tests:/opt/robotframework/tests # Mount tests for easier dev
       - ./QATests/resources:/opt/robotframework/resources # Mount resources for easier dev
+      - ./QATests/scripts:/opt/robotframework/scripts # Mount scripts for debugging
     # entrypoint: ["tail", "-f", "/dev/null"] # Manual run
     profiles: [ "test" ] # Only start when requested
 

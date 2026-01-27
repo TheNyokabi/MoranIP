@@ -25,10 +25,10 @@ function getAuthHeaders(endpoint?: string): HeadersInit {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` }),
     };
-    
+
     // Add X-Tenant-ID header for tenant-scoped endpoints
     if (typeof window !== 'undefined' && endpoint) {
-        const isTenantScoped = 
+        const isTenantScoped =
             endpoint.includes('/inventory/') ||
             endpoint.includes('/settings/') ||
             endpoint.includes('/pos/') ||
@@ -36,20 +36,20 @@ function getAuthHeaders(endpoint?: string): HeadersInit {
             endpoint.includes('/provisioning/') ||
             endpoint.includes('/erpnext/') ||
             endpoint.includes('/erp/');
-        
+
         if (isTenantScoped) {
             // Try to get tenant ID from auth store
             try {
                 const { useAuthStore } = require('@/store/auth-store');
                 const authState = useAuthStore.getState();
                 const tenantId = authState.currentTenant?.id || null;
-                
+
                 // Fallback: try to get from URL if in workspace route
                 if (!tenantId) {
                     const pathMatch = window.location.pathname.match(/^\/w\/([^\/]+)/);
                     if (pathMatch) {
                         const { availableTenants } = authState;
-                        const tenant = availableTenants?.find(t => t.code === pathMatch[1] || t.id === pathMatch[1]);
+                        const tenant = availableTenants?.find((t: any) => t.code === pathMatch[1] || t.id === pathMatch[1]);
                         if (tenant) {
                             (headers as Record<string, string>)['X-Tenant-ID'] = tenant.id;
                         }
@@ -62,7 +62,7 @@ function getAuthHeaders(endpoint?: string): HeadersInit {
             }
         }
     }
-    
+
     return headers;
 }
 
@@ -127,10 +127,57 @@ async function secureFetch(
     try {
         // Extract endpoint from URL for tenant context detection
         const endpoint = url.replace(API_BASE_URL, '');
-        const response = await fetch(url, {
+        const headers: Record<string, string> = { ...getAuthHeaders(endpoint) as Record<string, string> };
+        const tenantId = headers['X-Tenant-ID'] || null;
+
+        let finalUrl = url;
+        // Rewrite module endpoints to include tenant scope in URL path if not already present
+        if (tenantId && !endpoint.includes('/tenants/')) {
+            const erpModules = [
+                '/inventory', '/purchases', '/accounting', '/crm', '/hr',
+                '/paint', '/manufacturing', '/projects', '/sales',
+                '/support', '/assets', '/quality', '/permissions'
+            ];
+            const tenantModules = [
+                '/reports', '/commissions', '/dashboard', '/files'
+            ];
+
+            // Normalize endpoint by removing /api if present
+            let pathToCheck = endpoint;
+            if (pathToCheck.startsWith('/api/')) {
+                pathToCheck = pathToCheck.substring(4);
+            }
+
+            let identified = false;
+            let targetPath = '';
+
+            for (const prefix of erpModules) {
+                if (pathToCheck.startsWith(prefix)) {
+                    targetPath = `/api/tenants/${tenantId}/erp${pathToCheck}`;
+                    identified = true;
+                    break;
+                }
+            }
+
+            if (!identified) {
+                for (const prefix of tenantModules) {
+                    if (pathToCheck.startsWith(prefix)) {
+                        targetPath = `/api/tenants/${tenantId}${pathToCheck}`;
+                        identified = true;
+                        break;
+                    }
+                }
+            }
+
+            if (identified) {
+                finalUrl = `${API_BASE_URL}${targetPath}`;
+            }
+        }
+
+        const response = await fetch(finalUrl, {
             ...options,
             headers: {
-                ...getAuthHeaders(endpoint),
+                ...headers,
                 ...options.headers,
             },
         });
