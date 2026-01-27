@@ -5,7 +5,8 @@
 
 set -e
 
-API_URL="http://localhost:4000/api"
+#API_URL="http://localhost:4000/api"
+API_URL="http://localhost:9000"
 BACKEND_URL="http://localhost:9000"
 
 echo "============================================================"
