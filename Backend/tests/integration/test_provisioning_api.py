@@ -1,5 +1,6 @@
 """Integration tests for Provisioning API endpoints."""
 import pytest
+import pytest_asyncio
 from unittest.mock import patch
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ import uuid
 class TestProvisioningAPI:
     """Test suite for Provisioning API endpoints."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def test_user(self, db: Session):
         """Create test user."""
         user = User(
@@ -29,7 +30,7 @@ class TestProvisioningAPI:
         db.refresh(user)
         return user
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def test_tenant(self, db: Session, test_user):
         """Create test tenant."""
         tenant = Tenant(
@@ -56,7 +57,7 @@ class TestProvisioningAPI:
         
         return tenant
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def auth_token(self, async_client: AsyncClient, test_user):
         """Get auth token for test user."""
         response = await async_client.post(

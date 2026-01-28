@@ -4,7 +4,7 @@
  * Handles full Sales module (not just POS)
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface Quotation {
     name: string;

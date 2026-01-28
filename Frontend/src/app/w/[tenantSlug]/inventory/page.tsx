@@ -83,7 +83,7 @@ export default function InventoryPage() {
     const [loading, setLoading] = useState(true);
     const [stockAccountSuggestion, setStockAccountSuggestion] = useState<string | null>(null);
 
-    const isGroupWarehouse = (warehouse: POSWarehouse) => warehouse?.is_group === 1 || warehouse?.is_group === true;
+    const isGroupWarehouse = (warehouse: POSWarehouse) => (warehouse?.is_group as any) === 1 || (warehouse?.is_group as any) === true;
     const transactionWarehouses = warehouses.filter((warehouse) => !isGroupWarehouse(warehouse));
     const selectableWarehouses = transactionWarehouses.length ? transactionWarehouses : warehouses;
     const [warehouseTypes, setWarehouseTypes] = useState<string[]>([]);

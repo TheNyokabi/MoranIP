@@ -102,38 +102,49 @@ export async function apiFetch<T>(
             authToken = authState.token;
         }
 
-        // Get tenant ID from auth store (currentTenant) or from URL if in workspace context
-        tenantId = authState.currentTenant?.id || null;
-
-        // If no tenant in store, try to get from URL (for /w/{workspace_slug} routes)
-        if (!tenantId && isBrowser) {
+        // PRIORITY 1: Get tenant slug from URL (for /w/{workspace_slug} routes)
+        // This ensures API calls use the same slug as the URL for consistency
+        if (isBrowser) {
             const pathMatch = window.location.pathname.match(/^\/w\/([^\/]+)/);
             if (pathMatch) {
                 const tenantSlug = pathMatch[1];
-
-                // Try to find tenant by slug from available tenants
-                const { availableTenants } = authState;
-                const tenant = availableTenants?.find(t => t.code === tenantSlug || t.id === tenantSlug);
-                if (tenant) {
-                    tenantId = tenant.id;
-                } else {
-                    // Fallback: use the slug/id from the URL directly
+                // Use URL slug directly if it looks like a tenant code (TEN-XX-XX-XXXXX)
+                if (tenantSlug.startsWith('TEN-')) {
                     tenantId = tenantSlug;
+                } else {
+                    // Try to find tenant by slug from available tenants
+                    const { availableTenants } = authState;
+                    const tenant = availableTenants?.find(t => t.code === tenantSlug || t.id === tenantSlug);
+                    if (tenant) {
+                        // Prefer slug (code) over ID for URL consistency
+                        tenantId = tenant.code || tenant.id;
+                    } else {
+                        // Fallback: use the slug from the URL directly
+                        tenantId = tenantSlug;
+                    }
                 }
             }
         }
 
-        // If still no tenant ID, try to extract from endpoint path (e.g., /api/tenants/{tenant_id}/...)
+        // PRIORITY 2: Fall back to auth store tenant if not on a workspace route
+        if (!tenantId) {
+            // Get tenant SLUG (code) from auth store - prefer slug over ID for URL consistency
+            // The backend accepts both tenant_id (UUID) and tenant_code (slug like TEN-KE-26-XYZ)
+            tenantId = authState.currentTenant?.code || authState.currentTenant?.id || null;
+        }
+
+        // If still no tenant ID, try to extract from endpoint path (e.g., /api/tenants/{tenant_slug}/...)
         if (!tenantId && endpoint) {
             const endpointMatch = endpoint.match(/\/tenants\/([^\/]+)/);
             if (endpointMatch) {
-                const tenantIdFromPath = endpointMatch[1];
-                // Verify it's a valid tenant ID format (UUID or tenant code)
-                if (tenantIdFromPath && (tenantIdFromPath.startsWith('TEN-') || tenantIdFromPath.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
+                const tenantIdentifier = endpointMatch[1];
+                // Accept both UUID and tenant code (TEN-XX-XX-XXXXX format)
+                if (tenantIdentifier && (tenantIdentifier.startsWith('TEN-') || tenantIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
                     // Try to find tenant by ID or code from available tenants
                     const { availableTenants } = authState;
-                    const tenant = availableTenants?.find(t => t.id === tenantIdFromPath || t.code === tenantIdFromPath);
-                    tenantId = tenant ? tenant.id : tenantIdFromPath; // Use tenant ID if found, otherwise use the path value
+                    const tenant = availableTenants?.find(t => t.id === tenantIdentifier || t.code === tenantIdentifier);
+                    // Prefer slug (code) over ID for URL consistency
+                    tenantId = tenant ? (tenant.code || tenant.id) : tenantIdentifier;
                 }
             }
         }
@@ -173,7 +184,7 @@ export async function apiFetch<T>(
         const erpModules = [
             '/inventory', '/purchases', '/accounting', '/crm', '/hr',
             '/paint', '/manufacturing', '/projects', '/sales',
-            '/support', '/assets', '/quality', '/permissions'
+            '/support', '/assets', '/quality', '/permissions', '/pos'
         ];
         const tenantModules = [
             '/reports', '/commissions', '/dashboard', '/files'

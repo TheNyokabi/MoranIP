@@ -21,6 +21,7 @@ import { AccessibilityTools } from "@/components/pos/AccessibilityTools"
 import { SaleConfirmationModal } from "@/components/pos/sale-confirmation-modal"
 import { SaleSuccessModal } from "@/components/pos/sale-success-modal"
 import { EndSessionModal } from "@/components/pos/end-session-modal"
+import { CashPaymentModal } from "@/components/pos/CashPaymentModal"
 import {
     ShoppingCart,
     Plus,
@@ -115,6 +116,9 @@ export default function POSPage() {
     // Modal states for sale flow
     const [showConfirmationModal, setShowConfirmationModal] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [showCashPaymentModal, setShowCashPaymentModal] = useState(false)
+    const [amountTendered, setAmountTendered] = useState<number>(0)
+    const [changeAmount, setChangeAmount] = useState<number>(0)
 
     // Paint sales state
     const [colorCodes, setColorCodes] = useState<any[]>([])
@@ -186,8 +190,13 @@ export default function POSPage() {
                     posApi.getInvoices(token, 10).catch(() => ({ invoices: [] })),
                     posApi.getPosProfiles(token).catch(() => ({ profiles: [] })), // Fetch POS profiles
                     posApi.getCustomers(token).catch(() => ({ customers: [] })), // Fetch customers
-                    // For admins, include all warehouses even without POS profiles
-                    apiFetch(`/pos/warehouses${isSuperAdmin() ? '?include_all=true' : ''}`, {}, token).catch(() => ({ warehouses: [] }))
+                    // Request all warehouses - backend will filter based on user permissions
+                    // include_all=true works for admins, returns filtered list for others
+                    apiFetch('/pos/warehouses?include_all=true', {}, token).catch((err) => {
+                        console.warn('Warehouse fetch with include_all failed, trying without:', err)
+                        // Fallback without include_all if permission denied
+                        return apiFetch('/pos/warehouses', {}, token).catch(() => ({ warehouses: [] }))
+                    })
                 ])
                 const loadedItems = (itemsRes.items || []) as POSItem[]
                 setItems(loadedItems)
@@ -203,11 +212,13 @@ export default function POSPage() {
                 console.log('Is Super Admin:', isSuperAdmin())
 
                 // Filter out group warehouses (is_group = 1) - they cannot be used for transactions
-                const warehouses = warehousesRes?.warehouses || []
+                // Note: is_group can be 0, 1, false, true, null, or undefined
+                // We exclude warehouses where is_group is explicitly 1 or true
+                const warehouses = (warehousesRes as any)?.warehouses || []
                 console.log('Total warehouses received:', warehouses.length)
 
                 const transactionWarehouses = warehouses.filter(
-                    (w: any) => w.is_group === 0 || w.is_group === false
+                    (w: any) => w.is_group !== 1 && w.is_group !== true
                 )
                 console.log('Transaction warehouses after filtering:', transactionWarehouses.length)
 
@@ -228,25 +239,7 @@ export default function POSPage() {
                     setSelectedPosProfile(profiles[0].name || profiles[0].id)
                 }
 
-                // Bulk stock fetch (short-lived cached server-side)
-                try {
-                    const profileId = selectedPosProfile || (warehouses.length > 0 ? (warehouses[0]?.profile_id as string) : '') || (profiles.length > 0 ? (profiles[0].name || profiles[0].id) : '')
-                    if (profileId && loadedItems.length > 0) {
-                        const itemCodes = loadedItems.map(i => i.item_code).filter(Boolean)
-                        const stockRes = await posApi.getBulkStock(token, { pos_profile_id: profileId, item_codes: itemCodes })
-                        const qtyByItem = new Map<string, number>()
-                        for (const row of stockRes.stocks || []) {
-                            if (row?.item_code) qtyByItem.set(row.item_code, Number(row.qty) || 0)
-                        }
-                        setItems(prev => (prev || []).map(it => ({
-                            ...it,
-                            stock_qty: qtyByItem.has(it.item_code) ? qtyByItem.get(it.item_code) : (it.stock_qty ?? undefined),
-                        })))
-                    }
-                } catch (e) {
-                    // Non-fatal: grid still works, but without stock-based hiding
-                    console.warn('Failed to fetch bulk stock for POS items', e)
-                }
+                // Stock fetch moved to separate useEffect to ensure POS profile is set
             } catch (error) {
                 console.error('Failed to load PoS data:', error)
             } finally {
@@ -267,6 +260,55 @@ export default function POSPage() {
         }
     }, [selectedPosProfile, availableWarehouses, selectedWarehouse])
 
+    // Fetch bulk stock when POS profile is selected and items are loaded
+    useEffect(() => {
+        async function fetchBulkStock() {
+            if (!token || !selectedPosProfile || items.length === 0) return
+            
+            try {
+                const itemCodes = items.map(i => i.item_code).filter(Boolean)
+                if (itemCodes.length === 0) return
+                
+                console.log('[POS] Fetching bulk stock for', itemCodes.length, 'items with profile:', selectedPosProfile)
+                const stockRes = await posApi.getBulkStock(token, { 
+                    pos_profile_id: selectedPosProfile, 
+                    item_codes: itemCodes 
+                })
+                
+                const qtyByItem = new Map<string, number | undefined>()
+                for (const row of stockRes.stocks || []) {
+                    if (row?.item_code) {
+                        // Backend returns null for unknown stock, number for known stock
+                        const qty = row.qty === null || row.qty === undefined 
+                            ? undefined 
+                            : Number(row.qty)
+                        qtyByItem.set(row.item_code, qty)
+                    }
+                }
+                
+                const knownCount = Array.from(qtyByItem.values()).filter(v => v !== undefined).length
+                console.log('[POS] Stock data received:', knownCount, 'with stock,', qtyByItem.size - knownCount, 'unknown')
+                
+                setItems(prev => (prev || []).map(it => {
+                    // Use stock data if available, keep undefined for unknown stock
+                    // This ensures items with unknown stock remain visible
+                    const stockQty = qtyByItem.has(it.item_code) 
+                        ? qtyByItem.get(it.item_code) 
+                        : (it.stock_qty ?? undefined)
+                    return {
+                        ...it,
+                        stock_qty: stockQty,
+                    }
+                }))
+            } catch (e) {
+                console.warn('[POS] Failed to fetch bulk stock:', e)
+                // Non-fatal: grid still works, items remain visible with undefined stock
+            }
+        }
+        
+        fetchBulkStock()
+    }, [token, selectedPosProfile, items.length]) // Re-fetch when profile changes or items load
+
     // Load paint data separately when token and tenant context is available
     useEffect(() => {
         async function loadPaintData() {
@@ -280,7 +322,7 @@ export default function POSPage() {
             setTimeout(async () => {
                 try {
                     const colorCodesRes = await apiFetch('/paint/color-codes', {}, token).catch(() => ({ data: [] }))
-                    setColorCodes(colorCodesRes.data || [])
+                    setColorCodes((colorCodesRes as any).data || [])
                 } catch (error) {
                     console.error('Failed to load paint data:', error)
                     // Don't fail the whole POS if paint data fails
@@ -334,9 +376,8 @@ export default function POSPage() {
         )
     }
 
-    // Filter items by search + stock availability
-    // Browse (no search): show only in-stock items
-    // Search: include out-of-stock items but render as disabled
+    // Filter items by search - show ALL items including out-of-stock
+    // Out-of-stock items are displayed but disabled (handled in UI with isOutOfStock)
     const normalizedQuery = searchQuery.trim().toLowerCase()
     const filteredItems = items
         .filter(item => {
@@ -345,12 +386,6 @@ export default function POSPage() {
                 item.item_name.toLowerCase().includes(normalizedQuery) ||
                 item.item_code.toLowerCase().includes(normalizedQuery)
             )
-        })
-        .filter(item => {
-            if (normalizedQuery) return true
-            // If stock is unknown, keep item visible to avoid hiding everything
-            if (item.stock_qty === undefined) return true
-            return item.stock_qty > 0
         })
 
     // Cart calculations
@@ -408,6 +443,30 @@ export default function POSPage() {
         setReferralCode('')
         setSelectedPayment('Cash')
         setLoyaltyDiscount(0)
+    }
+
+    // Handle cash payment confirmation (amount tendered entered)
+    const handleCashPaymentConfirm = (tendered: number) => {
+        setAmountTendered(tendered)
+        setChangeAmount(tendered - cartGrandTotal)
+        setShowCashPaymentModal(false)
+        setShowConfirmationModal(true)
+    }
+
+    // Handle checkout button click - show appropriate modal
+    const handleCheckoutClick = () => {
+        if (!selectedPosProfile) {
+            toast.error('Please select a POS Profile before processing sale')
+            return
+        }
+        
+        if (selectedPayment === 'Cash') {
+            // Show cash payment modal for amount tendered and change calculation
+            setShowCashPaymentModal(true)
+        } else {
+            // For other payment methods, go directly to confirmation
+            setShowConfirmationModal(true)
+        }
     }
 
     // Handle M-Pesa payment success
@@ -635,6 +694,12 @@ export default function POSPage() {
                                 Analytics
                             </Button>
                         </Link>
+                        <Link href={`/w/${tenantSlug}/pos/cash-sessions`}>
+                            <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
+                                <Receipt className="h-4 w-4 mr-2" />
+                                Cash Sessions
+                            </Button>
+                        </Link>
                         <Link href={`/w/${tenantSlug}/pos/layaway`}>
                             <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
                                 <Package className="h-4 w-4 mr-2" />
@@ -719,17 +784,29 @@ export default function POSPage() {
                                 item_name: item.item_name,
                                 qty: item.qty || 1,
                                 rate: item.rate,
-                                total: (item.qty || 1) * item.rate
+                                total: (item.qty || 1) * item.rate,
+                                stock_uom: item.stock_uom || 'Unit',
+                                standard_rate: item.standard_rate || item.rate
                             }
-                            addToCart(cartItem)
+                            addToCart(cartItem as any)
                         }}
                         onCustomerSelect={(customer) => {
                             setSelectedCustomer(customer)
                             setShowCustomerPicker(false)
                         }}
                         onQuickSale={(data) => {
-                            toast.info('Quick sale feature coming soon')
+                            // Implementation to follow
+                            console.log('Quick sale', data)
                         }}
+                        onRepeatSale={(data) => {
+                            // Implementation to follow
+                            console.log('Repeat sale', data)
+                        }}
+                        onBulkAdd={(items) => {
+                            // Implementation to follow
+                            console.log('Bulk add', items)
+                        }}
+
                         onBarcodeScan={(barcode) => {
                             setSearchQuery(barcode)
                         }}
@@ -1223,13 +1300,7 @@ export default function POSPage() {
                         <Button
                             className="w-full h-12 bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-semibold"
                             disabled={cart.length === 0 || processing}
-                            onClick={() => {
-                                if (!selectedPosProfile) {
-                                    toast.error('Please select a POS Profile before processing sale')
-                                    return
-                                }
-                                setShowConfirmationModal(true)
-                            }}
+                            onClick={handleCheckoutClick}
                         >
                             {processing ? (
                                 <>
@@ -1247,10 +1318,25 @@ export default function POSPage() {
                 </div>
             </div>
 
+            {/* Cash Payment Modal - for entering amount tendered */}
+            <CashPaymentModal
+                open={showCashPaymentModal}
+                onClose={() => setShowCashPaymentModal(false)}
+                onConfirm={handleCashPaymentConfirm}
+                totalAmount={cartGrandTotal}
+                currency="KES"
+                isProcessing={processing}
+            />
+
             {/* Sale Confirmation Modal */}
             <SaleConfirmationModal
                 open={showConfirmationModal}
-                onClose={() => setShowConfirmationModal(false)}
+                onClose={() => {
+                    setShowConfirmationModal(false)
+                    // Reset cash payment state when closing
+                    setAmountTendered(0)
+                    setChangeAmount(0)
+                }}
                 onConfirm={processSale}
                 cart={cart}
                 customer={selectedCustomer}
@@ -1260,6 +1346,8 @@ export default function POSPage() {
                 discount={0}
                 total={cartGrandTotal}
                 isProcessing={processing}
+                amountTendered={selectedPayment === 'Cash' ? amountTendered : undefined}
+                changeAmount={selectedPayment === 'Cash' ? changeAmount : undefined}
             />
 
             {/* Sale Success Modal */}
@@ -1305,11 +1393,14 @@ export default function POSPage() {
             />
 
             {/* Receipt Preview Modal */}
-            <ReceiptPreview
-                invoiceId={lastInvoiceId}
-                isOpen={showReceiptPreview}
-                onClose={() => setShowReceiptPreview(false)}
-            />
+            {showReceiptPreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <ReceiptPreview
+                        invoiceId={lastInvoiceId}
+                        onClose={() => setShowReceiptPreview(false)}
+                    />
+                </div>
+            )}
         </div>
     )
 }

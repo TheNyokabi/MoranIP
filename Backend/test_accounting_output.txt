@@ -1,0 +1,168 @@
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-8.3.4, pluggy-1.6.0 -- /Library/Frameworks/Python.framework/Versions/3.13/bin/python3
+cachedir: .pytest_cache
+rootdir: /Volumes/Stuff/Start Ups/MoranERP/Backend
+configfile: pytest.ini
+plugins: asyncio-0.24.0, allure-pytest-2.15.0, anyio-4.10.0, Faker-37.11.0, cov-7.0.0
+asyncio: mode=Mode.STRICT, default_loop_scope=None
+collecting ... collected 4 items
+
+tests/integration/test_accounting_api.py::TestAccountingAPI::test_list_gl_entries PASSED [ 25%]
+tests/integration/test_accounting_api.py::TestAccountingAPI::test_list_journals PASSED [ 50%]
+tests/integration/test_accounting_api.py::TestAccountingAPI::test_list_accounts PASSED [ 75%]
+tests/integration/test_accounting_api.py::TestAccountingAPI::test_create_journal_entry PASSED [100%]
+ERROR: Coverage failure: total of 28.99 is less than fail-under=80.00
+
+
+=============================== warnings summary ===============================
+../../../../../Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pydantic/_internal/_config.py:295: 29 warnings
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pydantic/_internal/_config.py:295: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../../../../../Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/reportlab/lib/rl_safe_eval.py:12
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/reportlab/lib/rl_safe_eval.py:12: DeprecationWarning: ast.NameConstant is deprecated and will be removed in Python 3.14; use ast.Constant instead
+    haveNameConstant = hasattr(ast,'NameConstant')
+
+../../../../../Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pydantic/fields.py:1011
+../../../../../Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pydantic/fields.py:1011
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pydantic/fields.py:1011: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+app/models/paint.py:10
+  /Volumes/Stuff/Start Ups/MoranERP/Backend/app/models/paint.py:10: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+app/main.py:101
+  /Volumes/Stuff/Start Ups/MoranERP/Backend/app/main.py:101: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+../../../../../Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/fastapi/applications.py:4495
+  /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.13.5-final-0 _______________
+
+Name                                            Stmts   Miss   Cover   Missing
+------------------------------------------------------------------------------
+app/api/v2/pos.py                                 135     70  48.15%   135-206, 229-257, 278-292, 314-325, 347-365, 386-422, 433-451, 456-462, 467-489
+app/config.py                                      37      6  83.78%   49, 52-56
+app/database.py                                    11      4  63.64%   12-16
+app/dependencies/auth.py                          119     90  24.37%   16-30, 36-43, 80-82, 86-106, 110, 123-180, 199-210, 230-281
+app/dependencies/permissions.py                    90     73  18.89%   34-65, 85-122, 140-181, 199-216, 236-249, 266, 285
+app/dependencies/tenant.py                         20     13  35.00%   12-20, 33-44
+app/exceptions/__init__.py                          2      0 100.00%
+app/exceptions/provisioning.py                     16      8  50.00%   25-27, 40-42, 54-55
+app/main.py                                        83      3  96.39%   103, 111, 115
+app/middleware/__init__.py                          0      0 100.00%
+app/middleware/pos_cache_middleware.py            152    118  22.37%   38-94, 98-111, 115-127, 131-153, 158-172, 197, 203-229, 233-251, 255-264, 268-280, 284-296
+app/middleware/response_normalizer.py              43     27  37.21%   38-50, 66-69, 84, 103, 120-143, 159
+app/models/erp_modules.py                          35      0 100.00%
+app/models/iam.py                                 169      1  99.41%   10
+app/models/onboarding.py                          120      0 100.00%
+app/models/paint.py                               100      0 100.00%
+app/models/payment_reference.py                    52     12  76.92%   63, 68, 73, 77-84, 88, 92
+app/models/pos_profile.py                          44      0 100.00%
+app/models/pos_session.py                          63      0 100.00%
+app/models/pos_warehouse_access.py                 24      0 100.00%
+app/models/rbac.py                                100      6  94.00%   95-97, 124-126
+app/routers/accounting.py                         283    184  34.98%   16-19, 40-43, 63-65, 75-77, 127-145, 156-158, 168-186, 196-206, 222-224, 243-245, 255-257, 294-296, 313-315, 325-329, 347-351, 361-363, 373-377, 389-391, 410-412, 422-426, 449-453, 465-467, 477-479, 489-508, 519-530, 540-548, 558-574, 584-594, 606-608, 627-629, 646-664, 675-677, 687-696, 714-724
+app/routers/assets.py                              55     29  47.27%   30, 42-44, 54-56, 66-70, 81-83, 95-97, 107-109, 119-123, 134-136
+app/routers/audit.py                              143    111  22.38%   57-161, 182-284, 295-299, 314-366
+app/routers/auth.py                               131     86  34.35%   37-71, 100-104, 127, 140-174, 210-288, 309-358
+app/routers/commissions.py                        136     98  27.94%   64-142, 161-225, 237-295, 309-334, 349-369, 383-390
+app/routers/crm.py                                247    162  34.41%   24-27, 31-32, 45-70, 82-84, 94-96, 106-110, 121-123, 133-135, 145-147, 157-159, 169-173, 184-186, 196-198, 208-210, 221-229, 239-243, 254-256, 266-268, 284-286, 304-312, 322-326, 337-339, 349-351, 367-369, 387-395, 413-427, 438-440, 457-464, 484-486, 502-504, 521-523, 533-577, 588-590, 601-613, 627-643, 655-657, 675-677, 687-691, 702-703
+app/routers/dashboard.py                          165    139  15.76%   36-81, 99-146, 159-204, 223-287, 296-325, 330-367, 372-399, 404-426, 433-459, 466-495, 502-530
+app/routers/erp.py                                 36     22  38.89%   31-73, 76-86, 89-100
+app/routers/erp_modules.py                         91     73  19.78%   82-117, 134-161, 178-250, 270-296, 316-336
+app/routers/erpnext.py                            207    182  12.08%   26-69, 101-254, 270-282, 297-414, 429-440, 456-468, 483-494, 511-520
+app/routers/files.py                              159    112  29.56%   59-61, 66-70, 75-79, 94-152, 166-192, 213-257, 271-297, 311-332, 346-369
+app/routers/hr.py                                 219    142  35.16%   18-19, 31-33, 54-79, 89-167, 176-178, 189-197, 213-223, 238-251, 263-265, 275-277, 287-290, 299-301, 311-312, 324-326, 336-338, 348-351, 360-362, 372-373, 385-387, 397-399, 409-412, 423-425, 435-436, 448-456, 466-476, 486-497, 508-518, 528-537, 549-551, 568-570, 582-584, 603-605, 617-619, 629-631
+app/routers/i18n.py                                78     54  30.77%   32, 51-68, 90-99, 123-143, 167-187, 210-218, 242-268, 290-293
+app/routers/iam.py                                368    303  17.66%   26-35, 92-515, 532-604, 620-633, 655-684, 716-777, 800-815, 832-843, 865-926, 943-945, 970-1009, 1027-1069
+app/routers/imports.py                             54     38  29.63%   31-35, 46-67, 77-98
+app/routers/inventory.py                          672    536  20.24%   120-142, 152-158, 168-175, 187-195, 205-211, 234-270, 284-309, 319-330, 341-371, 381-435, 451-512, 524-737, 747-781, 790-798, 814-932, 971-1075, 1092-1099, 1110-1154, 1164-1165, 1184-1345, 1358-1459, 1469-1476, 1488-1506, 1516-1553, 1568-1622, 1637-1654, 1669-1682, 1696-1709
+app/routers/manufacturing.py                      146     92  36.99%   16-19, 32-35, 45-48, 58-62, 73-76, 86-88, 98-101, 111-114, 124-128, 139-142, 152-154, 166-169, 186-189, 207-225, 234-237, 247-248, 266-267, 279-282, 300-303, 313-317, 326-329, 341-344, 361-364, 374-378
+app/routers/notifications.py                      162    106  34.57%   64, 69-73, 90-116, 128-140, 154-190, 201-215, 226-246, 256-274, 285-305, 315-334, 351-367
+app/routers/odoo.py                                18      7  61.11%   27-34, 56-62
+app/routers/onboarding.py                         166     96  42.17%   139-171, 189-202, 222-249, 271-292, 305-320, 338-351, 369-382, 396-423, 447-472, 500-507, 538-550, 572-631
+app/routers/paint.py                              166    134  19.28%   42-52, 79-108, 126-144, 172-191, 206-216, 240-288, 306-321, 351-477, 497-580
+app/routers/permissions.py                        125     75  40.00%   79-124, 136-172, 184-223, 241, 274-301, 313-317, 330-355, 369-391, 403-419
+app/routers/pos.py                                720    602  16.39%   52-61, 140-176, 186-193, 204-282, 299-400, 417-556, 567-572, 584-599, 609-615, 625-632, 643-649, 659-664, 676-691, 702-712, 727-1372, 1385-1407, 1417-1424, 1434-1451, 1462-1478, 1494-1510, 1530-1544, 1557-1607, 1625-1667
+app/routers/pos_analytics.py                      192    138  28.12%   70-90, 112-128, 153-171, 195-212, 236-253, 277-294, 317-344, 366-376, 397-407, 423-550, 556, 571, 583, 595, 606, 616, 627-628, 634
+app/routers/pos_layaway.py                         49     18  63.27%   48-61, 71-73, 83-90, 100-102, 113-119
+app/routers/pos_loyalty.py                         52     23  55.77%   46-48, 58-60, 70-83, 93-103, 113-120
+app/routers/pos_orders.py                          57     35  38.60%   32-40, 57-61, 75-79, 94-101, 116-124, 138-142, 156-178
+app/routers/pos_payments.py                       195    121  37.95%   76-84, 100-147, 169-212, 234-283, 305-318, 343-361, 383-395, 417-432, 454-470, 492-504, 526-545, 567-575, 598-609, 631-642
+app/routers/pos_profiles.py                        52     34  34.62%   33-44, 61-69, 84-88, 104-123, 138-142
+app/routers/pos_quick_actions.py                   94     71  24.47%   35-54, 79-98, 123-142, 167-204, 228-258, 281-330, 354-398
+app/routers/pos_receipts.py                       102     83  18.63%   35-87, 112-152, 177-218, 243-284, 310-390
+app/routers/pos_sessions.py                        78     60  23.08%   31-41, 57-65, 79-83, 98-105, 125-229
+app/routers/pos_sync.py                           102     71  30.39%   38-42, 64-72, 95-107, 131-171, 193-205, 228-263, 284-297, 319-359, 383-397
+app/routers/pos_warehouse_access.py               139    102  26.62%   32-36, 43-56, 60-70, 74-87, 98-107, 125-153, 173-187, 198-207, 225-253, 273-287
+app/routers/projects.py                            99     60  39.39%   15-18, 30-33, 43-46, 56-60, 71-74, 84-86, 102-105, 123-126, 136-140, 149-152, 168-171, 189-192, 202-206, 215-218, 230-233, 250-253, 263-267
+app/routers/provisioning.py                       316    268  15.19%   86-232, 253-340, 365-470, 494-615, 637-677, 698-723
+app/routers/purchases.py                          184     82  55.43%   116-127, 138-141, 152-155, 167-171, 182-185, 202-215, 226-229, 240-243, 255-258, 269-272, 283-286, 299-302, 316-327, 338-341, 354-357, 371-382, 393-396
+app/routers/quality.py                             55     29  47.27%   29, 41-43, 53-55, 65-69, 80-82, 94-96, 106-108, 118-122, 133-135
+app/routers/rbac.py                               110     40  63.64%   90-91, 102-111, 134-172, 187-211, 223-245
+app/routers/reports.py                            150     97  35.33%   79-124, 145-180, 199-205, 221-266, 275-327, 334-382, 389-425, 432-464, 471-494, 501-525
+app/routers/roles.py                              217    156  28.11%   104-152, 164-199, 230-294, 323-368, 397-448, 460-480, 508-574, 590-640
+app/routers/sales.py                              102     60  41.18%   31, 43-45, 55-57, 67-71, 82-84, 96-98, 108-110, 120-124, 135-137, 149-151, 161-163, 173-177, 188-190, 202-205, 215-219, 229-236, 247-249
+app/routers/settings.py                           366    173  52.73%   33-54, 142-168, 187-207, 226-247, 267-303, 364-420, 440-512, 591-613, 632-653
+app/routers/support.py                             33     15  54.55%   29, 41-43, 53-55, 65-69, 80-82
+app/routers/tenant_setup.py                        85     65  23.53%   30-44, 55-125, 134-203
+app/routers/user_roles.py                         168    105  37.50%   99-142, 160-235, 256-294, 307-327, 340-375, 394-455, 487-528
+app/services/auth_service.py                       84     62  26.19%   20, 23, 26-34, 38-45, 49-70, 73-74, 89-120, 134-172
+app/services/cache/pos_cache.py                   255    217  14.90%   55-78, 91-110, 123-146, 158-177, 191-213, 226-245, 259-282, 295-314, 328-350, 363-382, 394-411, 424-451, 464-524, 533-561, 573-596
+app/services/engine_adapter.py                     12      4  66.67%   150-152, 164
+app/services/engine_health_service.py             133     92  30.83%   95-149, 168-198, 213-248, 263-305, 328-342, 361-362, 372-382
+app/services/erpnext_client.py                    402    363   9.70%   33-41, 53-135, 148-578, 587-594, 600-603, 606-607, 622-630, 644-649, 656, 676-687, 708-717, 736-772, 791-833, 867-928, 958-998, 1025-1066, 1078-1087, 1091, 1095
+app/services/erpnext_purchase_service.py          129    100  22.48%   26-49, 60-69, 76-82, 90-99, 106-113, 123-150, 157-166, 173-179, 187-196, 203-210, 217-224, 233-242, 250-273, 280-286, 295-304, 312-335, 342-348, 354, 367, 382, 405-407, 425, 443, 453, 473
+app/services/i18n/pos_translations.py              82     45  45.12%   44, 48-50, 204-214, 228-233, 247-252, 266-271, 284-289, 301-303, 322-323, 332, 347, 359-361
+app/services/import_service.py                    123    100  18.70%   19-24, 28-52, 56-109, 112-117, 121-128, 136-164, 168-190, 197-220
+app/services/odoo_client.py                       123     92  25.20%   25-31, 38-48, 54-73, 92-113, 133-153, 175, 195-241, 254-272, 278-289, 293-303, 307-316, 320-330, 334-343, 347-358, 362, 366, 370-376
+app/services/onboarding_service.py                223    190  14.80%   102, 111-118, 124-135, 158-225, 229-248, 258-288, 292-309, 313-325, 329-344, 348-361, 391-402, 411-429, 439-474, 482-513, 517-553, 559, 567-590, 599-611, 619
+app/services/paint_service.py                      83     72  13.25%   16-17, 21-33, 44-60, 68-106, 110-159, 163-199
+app/services/payments/mobile_money_service.py     177    144  18.64%   20-21, 46, 53-58, 62-78, 88-123, 131-149, 158-170, 177-181, 185-200, 210-245, 255-256, 265-277, 288-293, 297, 301, 317-355, 378-408, 429-442, 450-451
+app/services/payments/mpesa_service.py            136     89  34.56%   60-63, 67-90, 94, 98, 119-159, 174-200, 213-223, 227, 239-282, 303-341, 345
+app/services/pos/__init__.py                        0      0 100.00%
+app/services/pos/accounting_integration.py         66     55  16.67%   19, 34-40, 60-80, 97-116, 133-153, 170-174, 194-202, 225-229
+app/services/pos/erpnext_pos_service.py           321    285  11.21%   29-36, 40-48, 55-76, 85-120, 125-185, 192, 196, 214-256, 260-264, 268-277, 281-355, 375-404, 408-413, 417-418, 435-475, 479-483, 487-514, 518-519, 528-543, 552-562, 573-591, 595-596, 604-616, 625-634, 638-640, 646-666, 670-692, 696-732
+app/services/pos/event_bus.py                     209    138  33.97%   41-46, 50-53, 58-60, 75-94, 158-178, 191-203, 230-249, 253-268, 272-297, 301-305, 309-326, 330, 341-368, 387-402, 406-408, 412-426, 435-437, 443, 453, 463, 473
+app/services/pos/gl_distribution_service.py        74     61  17.57%   22, 47-111, 127-150, 163, 180, 201-219, 238-255, 276-279
+app/services/pos/inventory_integration.py          99     87  12.12%   21-22, 39-106, 110-128, 131-171, 181-229, 251, 269, 289-303
+app/services/pos/layaway_service.py               151    127  15.89%   59-114, 139-162, 181-248, 263-296, 300-303, 307, 311, 323-363, 379-425, 440-468, 477, 486-487
+app/services/pos/loyalty_service.py               133    106  20.30%   52-78, 92-93, 97-119, 134-161, 175-217, 234-265, 277-291, 303, 315-324, 337-360, 378-418, 427, 436-437
+app/services/pos/offline_service.py               211    153  27.49%   37-42, 48-51, 68-69, 101-121, 138-155, 170-199, 206-234, 241-254, 261-281, 298-346, 350-354, 366-384, 410-411, 435-464, 481-497, 506
+app/services/pos/plugin_registry.py               169    114  32.54%   109-117, 121, 125-126, 176-198, 210-232, 236-246, 250-257, 271-275, 279, 283, 287, 291, 295, 299, 303, 316-336, 348-381, 385-396, 405
+app/services/pos/pos_service_base.py                4      0 100.00%
+app/services/pos/pos_service_factory.py            16      7  56.25%   36-56
+app/services/pos/quick_actions_service.py         139    116  16.55%   36-38, 57-129, 148-230, 249-297, 316-329, 346-382, 386-394, 398-404
+app/services/pos/receipt_service.py               200    174  13.00%   27, 31-37, 56-132, 151-274, 291-362, 385-387, 415-417, 427, 431-444, 448-459, 463-474
+app/services/pos/vat_service.py                    45     35  22.22%   22, 35-85, 113-119, 133-143, 156-162
+app/services/provisioning_service.py             1330   1256   5.56%   54-160, 177-226, 273-274, 328-534, 555-577, 581-583, 593-620, 643-676, 692-723, 747-930, 947-1192, 1209-1278, 1292-1638, 1655-1945, 1962-1975, 1991-2151, 2168-2492, 2509-2680, 2697-2867, 2882-2890, 2920-3238
+app/services/purchase_service_base.py               3      0 100.00%
+app/services/purchase_service_factory.py            8      5  37.50%   27-36
+app/services/rbac_service.py                      103     82  20.39%   44-58, 72-90, 104-114, 135-179, 197-209, 240-276, 301-328, 357-383, 412-438, 469-483, 487-497
+app/utils/codes.py                                 59     36  38.98%   11, 19-23, 69-98, 112-124, 133
+------------------------------------------------------------------------------
+TOTAL                                           14261  10127  28.99%
+Coverage HTML written to dir htmlcov
+Coverage XML written to file coverage.xml
+FAIL Required test coverage of 80% not reached. Total coverage: 28.99%
+======================== 4 passed, 35 warnings in 2.22s ========================

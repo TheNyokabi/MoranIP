@@ -264,7 +264,7 @@ export function AccessibilityTools({ onSettingsChange, initialSettings }: Access
                 </Label>
                 <Slider
                   value={[settings.zoomLevel]}
-                  onValueChange={([value]) => handleSettingChange('zoomLevel', value)}
+                  onValueChange={([value]: number[]) => handleSettingChange('zoomLevel', value)}
                   min={75}
                   max={150}
                   step={5}
@@ -353,7 +353,7 @@ export function AccessibilityTools({ onSettingsChange, initialSettings }: Access
                 <Label>Font Size: {settings.fontSize}px</Label>
                 <Slider
                   value={[settings.fontSize]}
-                  onValueChange={([value]) => handleSettingChange('fontSize', value)}
+                  onValueChange={([value]: number[]) => handleSettingChange('fontSize', value)}
                   min={12}
                   max={24}
                   step={1}
@@ -366,7 +366,7 @@ export function AccessibilityTools({ onSettingsChange, initialSettings }: Access
                 <Label>Line Height: {settings.lineHeight}</Label>
                 <Slider
                   value={[settings.lineHeight]}
-                  onValueChange={([value]) => handleSettingChange('lineHeight', value)}
+                  onValueChange={([value]: number[]) => handleSettingChange('lineHeight', value)}
                   min={1.2}
                   max={2.0}
                   step={0.1}

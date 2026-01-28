@@ -3,7 +3,7 @@
  * Uses new /api/projects path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface Project {
     name: string;

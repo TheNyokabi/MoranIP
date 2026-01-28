@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import settings
 
 SQL_DATABASE_URL = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
@@ -7,6 +7,9 @@ SQL_DATABASE_URL = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PA
 # Synchronous Engine for normal operations
 engine = create_engine(SQL_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Base class for SQLAlchemy models
+Base = declarative_base()
 
 def get_db():
     db = SessionLocal()

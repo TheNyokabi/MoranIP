@@ -90,11 +90,11 @@ export default function PaintManagementPage() {
 
       // Load color codes
       const colorsRes = await apiFetch('/paint/color-codes', {}, authToken)
-      setColorCodes(colorsRes.data || [])
+      setColorCodes((colorsRes as any).data || [])
 
       // Load formulas
       const formulasRes = await apiFetch('/paint/formulas', {}, authToken)
-      setFormulas(formulasRes.data || [])
+      setFormulas((formulasRes as any).data || [])
 
     } catch (error) {
       console.error('Failed to load paint data:', error)
@@ -111,9 +111,11 @@ export default function PaintManagementPage() {
   const handleCreateColor = async () => {
     try {
       const rgbValues = colorForm.hex_code ?
-        { r: parseInt(colorForm.hex_code.slice(1, 3), 16),
+        {
+          r: parseInt(colorForm.hex_code.slice(1, 3), 16),
           g: parseInt(colorForm.hex_code.slice(3, 5), 16),
-          b: parseInt(colorForm.hex_code.slice(5, 7), 16) } : undefined
+          b: parseInt(colorForm.hex_code.slice(5, 7), 16)
+        } : undefined
 
       const data = {
         ...colorForm,
@@ -582,7 +584,7 @@ export default function PaintManagementPage() {
                         <CardHeader>
                           <CardTitle className="text-orange-800">No Active Formula</CardTitle>
                           <p className="text-sm text-orange-600">
-                            This color code doesn't have an active tint formula yet.
+                            This color code doesn&apos;t have an active tint formula yet.
                           </p>
                         </CardHeader>
                         <CardContent>

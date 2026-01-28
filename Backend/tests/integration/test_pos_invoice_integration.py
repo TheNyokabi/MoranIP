@@ -131,14 +131,14 @@ class TestPOSInvoiceIntegration:
             }
         ])
 
-        assert result['total_base_amount'] == Decimal('1000.00')
-        assert result['total_vat_amount'] == Decimal('160.00')
+        assert result['total_base'] == Decimal('1000.00')
+        assert result['total_vat'] == Decimal('160.00')
         assert result['total_amount'] == Decimal('1160.00')
 
     @pytest.mark.asyncio
     async def test_gl_distribution_integration(self, mock_erpnext_adapter):
         """Test GL distribution integration"""
-        gl_service = GLDistributionService()
+        gl_service = GLDistributionService(VATService())
         gl_service.erpnext_adapter = mock_erpnext_adapter
 
         invoice_data = {
@@ -190,14 +190,22 @@ class TestPOSInvoiceIntegration:
             # Missing pos_profile_id
         }
 
-        response = client.post(
-            "/api/pos/invoice",
-            json=invoice_request,
-            headers={"X-Tenant-ID": "test-tenant"}
-        )
+        # Override auth dependencies
+        from app.dependencies.auth import get_current_token_payload, require_tenant_access
+        app.dependency_overrides[require_tenant_access] = lambda: "test-tenant"
+        app.dependency_overrides[get_current_token_payload] = lambda: {"sub": "test-user", "tenant_id": "test-tenant"}
 
-        # Should fail with validation error
-        assert response.status_code == 422  # Validation error
+        try:
+            response = client.post(
+                "/api/pos/invoice",
+                json=invoice_request,
+                headers={"X-Tenant-ID": "test-tenant"}
+            )
+
+            # Should fail with validation error
+            assert response.status_code == 422  # Validation error
+        finally:
+            app.dependency_overrides = {}
 
     def test_payment_amount_validation(self, client):
         """Test payment amount validation"""
@@ -210,14 +218,22 @@ class TestPOSInvoiceIntegration:
             "pos_profile_id": "TEST_POS"
         }
 
-        response = client.post(
-            "/api/pos/invoice",
-            json=invoice_request,
-            headers={"X-Tenant-ID": "test-tenant"}
-        )
+        # Override auth dependencies
+        from app.dependencies.auth import get_current_token_payload, require_tenant_access
+        app.dependency_overrides[require_tenant_access] = lambda: "test-tenant"
+        app.dependency_overrides[get_current_token_payload] = lambda: {"sub": "test-user", "tenant_id": "test-tenant"}
 
-        # Should fail with payment validation error
-        assert response.status_code in [400, 422]
+        try:
+            response = client.post(
+                "/api/pos/invoice",
+                json=invoice_request,
+                headers={"X-Tenant-ID": "test-tenant"}
+            )
+
+            # Should fail with payment validation error
+            assert response.status_code in [400, 422]
+        finally:
+            app.dependency_overrides = {}
 
     @pytest.mark.asyncio
     async def test_offline_transaction_queue(self, mock_erpnext_adapter):
@@ -245,32 +261,48 @@ class TestPOSInvoiceIntegration:
 
     def test_api_response_format(self, client):
         """Test API response format consistency"""
-        # Test successful response structure
-        response = client.get("/api/pos/items", headers={"X-Tenant-ID": "test-tenant"})
+        # Override auth dependencies
+        from app.dependencies.auth import get_current_token_payload, require_tenant_access
+        app.dependency_overrides[require_tenant_access] = lambda: "test-tenant"
+        app.dependency_overrides[get_current_token_payload] = lambda: {"sub": "test-user", "tenant_id": "test-tenant"}
 
-        # Should return proper JSON structure even if empty
-        assert response.status_code in [200, 404]  # OK or Not Found for empty data
+        try:
+            # Test successful response structure
+            response = client.get("/api/pos/items", headers={"X-Tenant-ID": "test-tenant"})
 
-        if response.status_code == 200:
-            response_data = response.json()
-            # Should have consistent structure
-            assert isinstance(response_data, (list, dict))
+            # Should return proper JSON structure even if empty
+            assert response.status_code in [200, 404]  # OK or Not Found for empty data
+
+            if response.status_code == 200:
+                response_data = response.json()
+                # Should have consistent structure
+                assert isinstance(response_data, (list, dict))
+        finally:
+            app.dependency_overrides = {}
 
     def test_error_response_format(self, client):
         """Test error response format consistency"""
-        # Make invalid request
-        response = client.post(
-            "/api/pos/invoice",
-            json={"invalid": "data"},
-            headers={"X-Tenant-ID": "test-tenant"}
-        )
+        # Override auth dependencies
+        from app.dependencies.auth import get_current_token_payload, require_tenant_access
+        app.dependency_overrides[require_tenant_access] = lambda: "test-tenant"
+        app.dependency_overrides[get_current_token_payload] = lambda: {"sub": "test-user", "tenant_id": "test-tenant"}
 
-        # Should return structured error
-        assert response.status_code >= 400
-        error_data = response.json()
+        try:
+            # Make invalid request
+            response = client.post(
+                "/api/pos/invoice",
+                json={"invalid": "data"},
+                headers={"X-Tenant-ID": "test-tenant"}
+            )
 
-        # Should have consistent error structure
-        assert "detail" in error_data or "message" in error_data
+            # Should return structured error
+            assert response.status_code >= 400
+            error_data = response.json()
+
+            # Should have consistent error structure
+            assert "detail" in error_data or "message" in error_data
+        finally:
+            app.dependency_overrides = {}
 
     @pytest.mark.asyncio
     async def test_plugin_system_integration(self):

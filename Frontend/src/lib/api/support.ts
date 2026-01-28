@@ -3,7 +3,7 @@
  * Uses new /api/support path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface Issue {
     name: string;

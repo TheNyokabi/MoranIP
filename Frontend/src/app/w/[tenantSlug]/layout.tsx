@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { TenantSidebar } from "@/components/layout/tenant-sidebar"
+import { MobileSidebar } from "@/components/layout/mobile-sidebar"
 import { useAuthStore } from "@/store/auth-store"
 import { findTenantBySlug } from "@/store/tenant-store"
 
@@ -17,7 +18,7 @@ export default function TenantLayout({
     // Set current tenant when entering workspace
     useEffect(() => {
         const tenant = findTenantBySlug(params.tenantSlug, availableTenants);
-        
+
         // Only update if tenant is found and different from current
         if (tenant && (!currentTenant || currentTenant.id !== tenant.id)) {
             setCurrentTenant(tenant);
@@ -36,8 +37,14 @@ export default function TenantLayout({
 
     return (
         <div className="min-h-screen bg-background">
+            {/* Mobile Header */}
+            <div className="md:hidden flex items-center p-4 border-b bg-background sticky top-0 z-40">
+                <MobileSidebar tenantSlug={params.tenantSlug} />
+                <span className="font-semibold ml-2">Menu</span>
+            </div>
+
             <TenantSidebar tenantSlug={params.tenantSlug} />
-            <main className="pl-64 transition-all duration-300">
+            <main className="md:pl-64 transition-all duration-300">
                 <div className="container py-6">
                     {children}
                 </div>

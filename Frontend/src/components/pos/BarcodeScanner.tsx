@@ -164,7 +164,7 @@ export function BarcodeScanner({ onItemFound, onClose, posProfileId }: BarcodeSc
     try {
       const response = await apiFetch(`/pos/quick-actions/search-items?q=${encodeURIComponent(searchTerm)}${posProfileId ? `&pos_profile_id=${posProfileId}` : ''}&limit=5`, {}, token)
 
-      const items = response.search_results || []
+      const items = (response as any).search_results || []
 
       if (items.length === 1) {
         // Exact match - auto-add item

@@ -1,10 +1,11 @@
-from fastapi import Depends, HTTPException, status, Header, Path
+from fastapi import Depends, HTTPException, status, Header, Path, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from typing import Optional
 import uuid
+import re
 from app.config import settings
 from app.services.auth_service import ALGORITHM
 from app.models.iam import Membership
@@ -50,33 +51,48 @@ async def get_current_user(payload: dict = Depends(get_current_token_payload)):
         "is_super_admin": payload.get("is_super_admin", False),
     }
 
+def _extract_tenant_from_path(path: str) -> Optional[str]:
+    """Extract tenant_id from URL path like /api/tenants/{tenant_id}/..."""
+    match = re.search(r'/tenants/([^/]+)/', path)
+    if match:
+        return match.group(1)
+    return None
+
 async def require_tenant_access(
+    request: Request,
     payload: dict = Depends(get_current_token_payload),
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     db: Session = Depends(get_db)
 ):
     """
-    Ensures the token has tenant context (either in JWT or X-Tenant-ID header).
+    Ensures the token has tenant context (either in JWT, URL path, X-Tenant-ID header).
     Returns the tenant_id (UUID).
     
     Priority:
     1. tenant_id from JWT token (if present)
-    2. X-Tenant-ID header (if present and user has membership)
+    2. tenant_id from URL path (if present, e.g., /api/tenants/{tenant_id}/...)
+    3. X-Tenant-ID header (if present and user has membership)
     
-    Note: X-Tenant-ID can be either UUID or tenant code/slug (e.g., TEN-KE-26-8K1E0).
+    Note: tenant_id can be either UUID or tenant code/slug (e.g., TEN-KE-26-8K1E0).
     SUPER_ADMIN users bypass membership checks and can access any tenant.
     """
     token_tenant_id = payload.get("tenant_id")
     is_super_admin = payload.get("is_super_admin", False)
     user_id = payload.get("sub")
     
-    # Resolve tenant_id from various sources (priority: token > header)
+    # Extract tenant_id from URL path
+    path_tenant_id = _extract_tenant_from_path(request.url.path)
+    
+    # Resolve tenant_id from various sources (priority: token > path > header)
     resolved_tenant_id = None
     tenant_source = None
     
     if token_tenant_id:
         resolved_tenant_id = token_tenant_id
         tenant_source = "token"
+    elif path_tenant_id:  # Path parameter
+        resolved_tenant_id = path_tenant_id
+        tenant_source = "path"
     elif x_tenant_id:  # Header
         resolved_tenant_id = x_tenant_id
         tenant_source = "header"

@@ -3,7 +3,7 @@
  * Uses new /api/manufacturing path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface WorkCenter {
     name: string;

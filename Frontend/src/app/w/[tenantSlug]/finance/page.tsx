@@ -35,11 +35,11 @@ export default function FinancePage() {
     useEffect(() => {
         if (!token) return;
         Promise.all([
-            accountingApi.getAccounts(token),
-            accountingApi.getGLEntries(token)
+            accountingApi.listAccounts(),
+            accountingApi.listGLEntries()
         ]).then(([accs, gls]) => {
-            setAccounts(accs);
-            setEntries(gls);
+            setAccounts(accs.data);
+            setEntries(gls.data);
             setLoading(false);
         });
     }, [token]);

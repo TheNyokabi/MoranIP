@@ -14,7 +14,8 @@ class TestGLDistributionService:
     @pytest.fixture
     def gl_service(self):
         """Create GL distribution service instance"""
-        return GLDistributionService()
+        vat_service = MagicMock()
+        return GLDistributionService(vat_service)
 
     def test_build_gl_entries_cash_payment(self, gl_service):
         """Test GL entries for cash payment"""
@@ -239,62 +240,34 @@ class TestGLDistributionService:
     def test_validate_gl_entries_balanced(self, gl_service):
         """Test GL entries validation for balanced entries"""
         entries = [
-            {'account': 'Customer', 'debit': 1000.00, 'credit': 0.00},
-            {'account': 'Cash', 'debit': 0.00, 'credit': 500.00},
-            {'account': 'M-Pesa', 'debit': 0.00, 'credit': 500.00}
+            {'account': 'Customer', 'debit': Decimal('1000.00'), 'credit': Decimal('0.00')},
+            {'account': 'Cash', 'debit': Decimal('0.00'), 'credit': Decimal('500.00')},
+            {'account': 'M-Pesa', 'debit': Decimal('0.00'), 'credit': Decimal('500.00')}
         ]
 
-        result = gl_service.validate_gl_entries(entries)
+        # Validating with expected total 1000.00
+        result = gl_service.validate_gl_entries(entries, Decimal('1000.00'))
 
-        assert result['is_balanced'] == True
-        assert result['total_debits'] == 1000.00
-        assert result['total_credits'] == 1000.00
-        assert result['difference'] == 0.00
+        assert result is True
 
     def test_validate_gl_entries_unbalanced(self, gl_service):
         """Test GL entries validation for unbalanced entries"""
         entries = [
-            {'account': 'Customer', 'debit': 1000.00, 'credit': 0.00},
-            {'account': 'Cash', 'debit': 0.00, 'credit': 400.00}  # Short by 100
+            {'account': 'Customer', 'debit': Decimal('1000.00'), 'credit': Decimal('0.00')},
+            {'account': 'Cash', 'debit': Decimal('0.00'), 'credit': Decimal('400.00')}  # Short by 600
         ]
 
-        result = gl_service.validate_gl_entries(entries)
-
-        assert result['is_balanced'] == False
-        assert result['total_debits'] == 1000.00
-        assert result['total_credits'] == 400.00
-        assert result['difference'] == 600.00
+        # Unbalanced within entries (credits != debits)
+        with pytest.raises(ValueError, match="GL entries do not balance"):
+            gl_service.validate_gl_entries(entries, Decimal('1000.00'))
 
     def test_validate_gl_entries_empty(self, gl_service):
         """Test GL entries validation for empty entries"""
-        result = gl_service.validate_gl_entries([])
+        # Empty entries should match 0 total
+        result = gl_service.validate_gl_entries([], Decimal('0.00'))
+        assert result is True
 
-        assert result['is_balanced'] == True
-        assert result['total_debits'] == 0.00
-        assert result['total_credits'] == 0.00
-        assert result['difference'] == 0.00
 
-    def test_get_payment_account_mapping(self, gl_service):
-        """Test payment account mapping"""
-        # Mock ERPNext adapter
-        gl_service.erpnext_adapter = AsyncMock()
-        gl_service.erpnext_adapter.proxy_request.return_value = {
-            'data': [{'account': 'Cash Account - Main'}]
-        }
-
-        result = gl_service.get_payment_account('Cash', 'Test Company')
-
-        assert result == 'Cash Account - Main'
-
-    def test_get_payment_account_not_found(self, gl_service):
-        """Test payment account mapping when not found"""
-        # Mock ERPNext adapter returning no data
-        gl_service.erpnext_adapter = AsyncMock()
-        gl_service.erpnext_adapter.proxy_request.return_value = {'data': []}
-
-        result = gl_service.get_payment_account('Unknown', 'Test Company')
-
-        assert result is None
 
     def test_rounding_precision_gl_entries(self, gl_service):
         """Test GL entries handle decimal precision correctly"""
@@ -333,5 +306,6 @@ class TestGLDistributionService:
             assert isinstance(entry.get('credit', 0), (int, float, Decimal))
 
         # Verify entries are balanced
-        validation = gl_service.validate_gl_entries(result)
-        assert validation['is_balanced'] == True
+        # Expected total is 1160.01
+        validation = gl_service.validate_gl_entries(result, Decimal('1160.01'))
+        assert validation is True

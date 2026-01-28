@@ -49,7 +49,7 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
         {},
         token
       )
-      setReceiptData(response)
+      setReceiptData(response as ReceiptData)
     } catch (error) {
       console.error('Failed to load receipt:', error)
       toast({

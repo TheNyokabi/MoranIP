@@ -114,6 +114,31 @@ export async function getPurchaseReceipt(id: string): Promise<PurchaseReceipt> {
     return data.data;
 }
 
+export async function updatePurchaseReceipt(id: string, data: Partial<ReceiptRequest>): Promise<PurchaseReceipt> {
+    const result = await apiPut<{ data: PurchaseReceipt }>(`/purchases/receipts/${encodeURIComponent(id)}`, data);
+    return result.data;
+}
+
+export async function deletePurchaseReceipt(id: string): Promise<void> {
+    await apiDelete(`/purchases/receipts/${encodeURIComponent(id)}`);
+}
+
+export async function submitPurchaseReceipt(id: string): Promise<{ message: string; receipt_id: string; status: string; inventory_updated: boolean }> {
+    const result = await apiPost<{ message: string; receipt_id: string; status: string; inventory_updated: boolean }>(
+        `/purchases/receipts/${encodeURIComponent(id)}/submit`, 
+        {}
+    );
+    return result;
+}
+
+export async function cancelPurchaseReceipt(id: string): Promise<{ message: string; receipt_id: string; status: string; inventory_reversed: boolean }> {
+    const result = await apiPost<{ message: string; receipt_id: string; status: string; inventory_reversed: boolean }>(
+        `/purchases/receipts/${encodeURIComponent(id)}/cancel`, 
+        {}
+    );
+    return result;
+}
+
 // ==================== PURCHASE INVOICES ====================
 
 export async function createPurchaseInvoice(data: InvoiceRequest): Promise<PurchaseInvoice> {
@@ -136,4 +161,17 @@ export async function getPurchaseInvoices(params?: InvoicesQuery): Promise<Purch
 export async function getPurchaseInvoice(id: string): Promise<PurchaseInvoice> {
     const data = await apiGet<{ data: PurchaseInvoice }>(`/purchases/invoices/${encodeURIComponent(id)}`);
     return data.data;
+}
+
+export async function updatePurchaseInvoice(id: string, data: Partial<InvoiceRequest>): Promise<PurchaseInvoice> {
+    const result = await apiPut<{ data: PurchaseInvoice }>(`/purchases/invoices/${encodeURIComponent(id)}`, data);
+    return result.data;
+}
+
+export async function deletePurchaseInvoice(id: string): Promise<void> {
+    await apiDelete(`/purchases/invoices/${encodeURIComponent(id)}`);
+}
+
+export async function deletePurchaseOrder(id: string): Promise<void> {
+    await apiDelete(`/purchases/orders/${encodeURIComponent(id)}`);
 }

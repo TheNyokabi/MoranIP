@@ -80,11 +80,11 @@ export function DataTable({
   // Filter data based on search query
   const filteredData = searchable && searchQuery
     ? data.filter((row) =>
-        columns.some((col) => {
-          const value = row[col.key];
-          return value && String(value).toLowerCase().includes(searchQuery.toLowerCase());
-        })
-      )
+      columns.some((col) => {
+        const value = row[col.key];
+        return value && String(value).toLowerCase().includes(searchQuery.toLowerCase());
+      })
+    )
     : data;
 
   // Paginate data
@@ -117,7 +117,7 @@ export function DataTable({
   if (!data || data.length === 0) {
     return (
       <EmptyState
-        icon={emptyIcon}
+        icon={emptyIcon as any}
         title={emptyMessage}
         description="Get started by creating a new item"
       />
@@ -139,7 +139,7 @@ export function DataTable({
           </div>
         )}
         <EmptyState
-          icon={emptyIcon}
+          icon={emptyIcon as any}
           title="No results found"
           description={`No items match "${searchQuery}"`}
         />
@@ -176,11 +176,10 @@ export function DataTable({
             {paginatedData.map((row, idx) => (
               <TableRow
                 key={idx}
-                className={`border-b border-gray-200 dark:border-gray-800 ${
-                  onRowClick || rowLink
+                className={`border-b border-gray-200 dark:border-gray-800 ${onRowClick || rowLink
                     ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors'
                     : ''
-                }`}
+                  }`}
                 onClick={(e) => handleRowClick(row, e)}
               >
                 {columns.map((column) => (

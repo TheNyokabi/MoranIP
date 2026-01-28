@@ -1,159 +1,145 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   ArrowLeft,
   Edit,
   Save,
   X,
-  DollarSign,
   Building2,
   Calendar,
   Truck,
   ShoppingCart,
-  TrendingUp,
-  CheckCircle2,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Package,
+  RefreshCw,
+  Plus,
 } from 'lucide-react';
-import { ErrorHandler } from '@/components/error-handler';
-import { Badge } from '@/components/ui/badge';
-
-interface PurchaseOrderItem {
-  item_code: string;
-  item_name: string;
-  qty: number;
-  rate: number;
-  amount: number;
-}
-
-interface PurchaseOrder {
-  name: string;
-  supplier_name: string;
-  supplier: string;
-  order_date?: string;
-  delivery_date?: string;
-  total: number;
-  grand_total?: number;
-  status?: 'Draft' | 'Open' | 'Partially Received' | 'Received' | 'Cancelled';
-  items?: PurchaseOrderItem[];
-  creation: string;
-  modified: string;
-}
+import { 
+  getPurchaseOrder, 
+  updatePurchaseOrder, 
+  submitPurchaseOrder, 
+  cancelPurchaseOrder 
+} from '@/lib/api/purchases';
+import type { PurchaseOrder as PurchaseOrderType } from '@/lib/types/purchases';
+import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 const STATUS_COLORS: Record<string, string> = {
   'Draft': 'bg-gray-100 text-gray-800',
   'Open': 'bg-blue-100 text-blue-800',
-  'Partially Received': 'bg-yellow-100 text-yellow-800',
+  'To Receive': 'bg-yellow-100 text-yellow-800',
+  'To Receive and Bill': 'bg-yellow-100 text-yellow-800',
+  'Partially Received': 'bg-orange-100 text-orange-800',
+  'Completed': 'bg-green-100 text-green-800',
   'Received': 'bg-green-100 text-green-800',
   'Cancelled': 'bg-red-100 text-red-800',
 };
 
 export default function PurchaseOrderDetailPage() {
-  const params = useParams() as any;
+  const params = useParams();
   const router = useRouter();
   const tenantSlug = params.tenantSlug as string;
   const purchaseOrderId = params.purchaseOrderId as string;
-  const tenantId = tenantSlug;
 
-  const [order, setOrder] = useState<PurchaseOrder | null>(null);
+  const [order, setOrder] = useState<PurchaseOrderType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('items');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
-    supplier_name: '',
-    supplier: '',
     order_date: '',
-    delivery_date: '',
-    total: 0,
-    items: [] as PurchaseOrderItem[],
+    items: [] as any[],
   });
 
-  useEffect(() => {
-    if (tenantId && purchaseOrderId) {
-      fetchOrder();
-    }
-  }, [tenantId, purchaseOrderId]);
-
-  const fetchOrder = async () => {
-    setLoading(true);
+  const loadOrder = useCallback(async () => {
     try {
-      const response = await fetch(
-        `/api/tenants/${tenantId}/erp/purchasing/purchase-orders/${purchaseOrderId}`,
-        {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        const orderData = data.data || data;
-        setOrder(orderData);
-        setFormData({
-          supplier_name: orderData.supplier_name || '',
-          supplier: orderData.supplier || '',
-          order_date: orderData.order_date || '',
-          delivery_date: orderData.delivery_date || '',
-          total: orderData.total || orderData.grand_total || 0,
-          items: orderData.items || [],
-        });
-      } else {
-        setError('Failed to load purchase order');
-      }
-    } catch (err) {
-      setError(String(err));
+      setLoading(true);
+      const data = await getPurchaseOrder(purchaseOrderId);
+      setOrder(data);
+      setFormData({
+        order_date: data.order_date || data.transaction_date || '',
+        items: data.items || [],
+      });
+    } catch (error) {
+      console.error('Failed to load order:', error);
+      toast.error('Failed to load purchase order');
     } finally {
       setLoading(false);
     }
-  };
+  }, [purchaseOrderId]);
+
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
 
   const handleSave = async () => {
     if (!order) return;
     setIsSaving(true);
     try {
-      const response = await fetch(
-        `/api/tenants/${tenantId}/erp/purchasing/purchase-orders/${purchaseOrderId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify(formData),
-        }
-      );
-
-      if (response.ok) {
-        setEditMode(false);
-        await fetchOrder();
-      } else {
-        setError('Failed to save changes');
-      }
-    } catch (err) {
-      setError(String(err));
+      await updatePurchaseOrder(order.id, {
+        order_date: formData.order_date,
+        items: formData.items,
+      });
+      toast.success('Changes saved');
+      setEditMode(false);
+      loadOrder();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save changes');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const addItem = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, { item_code: '', item_name: '', qty: 1, rate: 0, amount: 0 }],
-    });
+  const handleSubmit = async () => {
+    if (!order) return;
+    setIsSubmitting(true);
+    try {
+      await submitPurchaseOrder(order.id);
+      toast.success('Purchase order submitted');
+      loadOrder();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to submit order');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!order) return;
+    setIsSubmitting(true);
+    try {
+      await cancelPurchaseOrder(order.id);
+      toast.success('Purchase order cancelled');
+      loadOrder();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to cancel order');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...formData.items];
-    const item = newItems[index];
-    (item as any)[field] = value;
+    newItems[index] = { ...newItems[index], [field]: value };
     if (field === 'qty' || field === 'rate') {
-      item.amount = item.qty * item.rate;
+      newItems[index].amount = newItems[index].qty * newItems[index].rate;
     }
     setFormData({ ...formData, items: newItems });
   };
@@ -165,21 +151,38 @@ export default function PurchaseOrderDetailPage() {
     });
   };
 
+  const getDocStatus = () => {
+    const docstatus = (order as any)?.docstatus ?? 0;
+    if (docstatus === 1) return { label: 'Submitted', canSubmit: false, canCancel: true };
+    if (docstatus === 2) return { label: 'Cancelled', canSubmit: false, canCancel: false };
+    return { label: 'Draft', canSubmit: true, canCancel: false };
+  };
+
   if (loading) {
-    return <div className="p-8 text-center">Loading purchase order...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   if (!order) {
-    return <ErrorHandler error="Purchase Order not found" />;
+    return (
+      <div className="text-center py-12">
+        <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Order Not Found</h2>
+        <p className="text-muted-foreground mb-4">The purchase order could not be found.</p>
+        <Button onClick={() => router.back()}>Go Back</Button>
+      </div>
+    );
   }
 
-  const orderDate = formData.order_date ? new Date(formData.order_date) : null;
-  const deliveryDate = formData.delivery_date ? new Date(formData.delivery_date) : null;
-  const daysToDeliver = deliveryDate ? Math.ceil((deliveryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-  const totalAmount = formData.items.reduce((sum, item) => sum + item.amount, 0);
+  const docStatus = getDocStatus();
+  const totalAmount = formData.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+  const orderStatus = order.status || docStatus.label;
 
   return (
-    <div className="p-6 space-y-6 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -187,14 +190,39 @@ export default function PurchaseOrderDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{order.name}</h1>
-            <p className="text-sm text-gray-600">
-              🏢 {formData.supplier_name || formData.supplier}
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{order.name || order.id}</h1>
+              <Badge className={STATUS_COLORS[orderStatus] || 'bg-gray-100 text-gray-800'}>
+                {orderStatus}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              {order.supplier_name || order.supplier_id}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          {!editMode && (
+          {docStatus.canSubmit && (
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              Submit Order
+            </Button>
+          )}
+          {docStatus.canCancel && (
+            <Button variant="destructive" onClick={handleCancel} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <XCircle className="h-4 w-4 mr-2" />
+              )}
+              Cancel Order
+            </Button>
+          )}
+          {!editMode && docStatus.canSubmit && (
             <Button onClick={() => setEditMode(true)} variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -215,305 +243,176 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      {error && <ErrorHandler error={error} />}
-
-      {/* Status Badge */}
-      <div className="flex gap-2">
-        <Badge className={STATUS_COLORS[order.status || 'Open'] || 'bg-gray-100 text-gray-800'}>
-          <ShoppingCart className="h-3 w-3 mr-1" />
-          {order.status || 'Open'}
-        </Badge>
-      </div>
+      {/* Quick Actions */}
+      {(orderStatus === 'To Receive' || orderStatus === 'To Receive and Bill' || orderStatus === 'Submitted') && (
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <Package className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-blue-800 dark:text-blue-200">Ready to Receive</h3>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    This order is ready for goods receipt. Create a purchase receipt to update inventory.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => router.push(`/w/${tenantSlug}/purchasing/receipts/new?order=${order.id}`)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Receipt
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-1">
-              <Building2 className="h-4 w-4" />
-              Supplier
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {editMode ? (
-              <Input
-                value={formData.supplier_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, supplier_name: e.target.value })
-                }
-              />
-            ) : (
-              <p className="text-sm font-medium">{formData.supplier_name}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              Order Date
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {editMode ? (
-              <Input
-                type="date"
-                value={formData.order_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, order_date: e.target.value })
-                }
-              />
-            ) : (
-              <p className="text-sm font-medium">
-                {orderDate ? orderDate.toLocaleDateString() : '-'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-1">
-              <Truck className="h-4 w-4" />
-              Expected Delivery
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {editMode ? (
-              <Input
-                type="date"
-                value={formData.delivery_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, delivery_date: e.target.value })
-                }
-              />
-            ) : (
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-8 w-8 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">
-                  {deliveryDate ? deliveryDate.toLocaleDateString() : '-'}
-                </p>
-                {daysToDeliver !== null && (
-                  <p className={`text-xs ${daysToDeliver < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {daysToDeliver < 0 ? `${Math.abs(daysToDeliver)} days overdue` : `${daysToDeliver} days`}
-                  </p>
+                <p className="text-sm text-muted-foreground">Supplier</p>
+                <p className="font-semibold">{order.supplier_name || order.supplier_id}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Calendar className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Order Date</p>
+                {editMode ? (
+                  <Input
+                    type="date"
+                    value={formData.order_date}
+                    onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="font-semibold">{order.order_date || order.transaction_date || '-'}</p>
                 )}
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-1">
-              <DollarSign className="h-4 w-4" />
-              Order Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-blue-600">
-              ${totalAmount?.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-            </p>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Items</p>
+                <p className="font-semibold">{formData.items.length} items</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Truck className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Total Value</p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatCurrency(order.grand_total || order.total_amount || totalAmount)}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
+      {/* Items Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Purchase Order Details</CardTitle>
-          <CardDescription>Items and delivery information</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Order Items
+          </CardTitle>
+          <CardDescription>Items included in this purchase order</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="items">Items</TabsTrigger>
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="info">Information</TabsTrigger>
-            </TabsList>
-
-            {/* Items Tab */}
-            <TabsContent value="items" className="space-y-4">
-              {editMode && (
-                <Button onClick={addItem} className="w-full">
-                  + Add Item
-                </Button>
-              )}
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-2">Item Code</th>
-                      <th className="text-left py-2 px-2">Item Name</th>
-                      <th className="text-right py-2 px-2">Qty</th>
-                      <th className="text-right py-2 px-2">Rate</th>
-                      <th className="text-right py-2 px-2">Amount</th>
-                      {editMode && <th className="text-center py-2 px-2">Action</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.items.map((item, idx) => (
-                      <tr key={idx} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-2">
-                          {editMode ? (
-                            <Input
-                              value={item.item_code}
-                              onChange={(e) =>
-                                updateItem(idx, 'item_code', e.target.value)
-                              }
-                              className="text-xs"
-                            />
-                          ) : (
-                            item.item_code
-                          )}
-                        </td>
-                        <td className="py-3 px-2">
-                          {editMode ? (
-                            <Input
-                              value={item.item_name}
-                              onChange={(e) =>
-                                updateItem(idx, 'item_name', e.target.value)
-                              }
-                              className="text-xs"
-                            />
-                          ) : (
-                            item.item_name
-                          )}
-                        </td>
-                        <td className="text-right py-3 px-2">
-                          {editMode ? (
-                            <Input
-                              type="number"
-                              value={item.qty}
-                              onChange={(e) =>
-                                updateItem(idx, 'qty', parseFloat(e.target.value) || 0)
-                              }
-                              className="text-xs text-right"
-                            />
-                          ) : (
-                            item.qty
-                          )}
-                        </td>
-                        <td className="text-right py-3 px-2">
-                          {editMode ? (
-                            <Input
-                              type="number"
-                              value={item.rate}
-                              onChange={(e) =>
-                                updateItem(idx, 'rate', parseFloat(e.target.value) || 0)
-                              }
-                              className="text-xs text-right"
-                            />
-                          ) : (
-                            `$${item.rate.toFixed(2)}`
-                          )}
-                        </td>
-                        <td className="text-right py-3 px-2 font-medium">
-                          ${item.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                        </td>
-                        {editMode && (
-                          <td className="text-center py-3 px-2">
-                            <Button
-                              onClick={() => removeItem(idx)}
-                              variant="ghost"
-                              size="sm"
-                            >
-                              Remove
-                            </Button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                    <tr className="font-bold border-t-2">
-                      <td colSpan={4} className="text-right py-3 px-2">
-                        Total:
-                      </td>
-                      <td className="text-right py-3 px-2">
-                        ${totalAmount?.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </TabsContent>
-
-            {/* Details Tab */}
-            <TabsContent value="details" className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Supplier</label>
-                  {editMode ? (
-                    <Input
-                      value={formData.supplier}
-                      onChange={(e) =>
-                        setFormData({ ...formData, supplier: e.target.value })
-                      }
-                      disabled
-                    />
-                  ) : (
-                    <p className="p-2 bg-gray-50 rounded">{formData.supplier}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Items Count</label>
-                  <p className="p-2 bg-gray-50 rounded">{formData.items.length} items</p>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Information Tab */}
-            <TabsContent value="info" className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-blue-900">Created</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-medium">
-                      {new Date(order.creation).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-purple-50 border-purple-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-purple-900">Modified</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-medium">
-                      {new Date(order.modified).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-blue-900">Total Value</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-bold text-lg">
-                      ${totalAmount?.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
-                <CardHeader>
-                  <CardTitle className="text-sm">Order Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <p>✓ PO Number: {order.name}</p>
-                  <p>✓ Supplier: {formData.supplier_name}</p>
-                  <p>✓ Items: {formData.items.length}</p>
-                  <p>✓ Total: ${totalAmount?.toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
-                  <p>✓ Status: {order.status || 'Open'}</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          {formData.items.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No items in this order
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item Code</TableHead>
+                  <TableHead>UOM</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  {editMode && <TableHead></TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {formData.items.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="font-medium">
+                      {editMode ? (
+                        <Input
+                          value={item.item_code}
+                          onChange={(e) => updateItem(idx, 'item_code', e.target.value)}
+                          className="w-40"
+                        />
+                      ) : (
+                        item.item_code
+                      )}
+                    </TableCell>
+                    <TableCell>{item.uom || 'Nos'}</TableCell>
+                    <TableCell className="text-right">
+                      {editMode ? (
+                        <Input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => updateItem(idx, 'qty', Number(e.target.value))}
+                          className="w-20 text-right"
+                        />
+                      ) : (
+                        item.qty
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {editMode ? (
+                        <Input
+                          type="number"
+                          value={item.rate}
+                          onChange={(e) => updateItem(idx, 'rate', Number(e.target.value))}
+                          className="w-24 text-right"
+                        />
+                      ) : (
+                        formatCurrency(item.rate)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(item.qty * item.rate)}
+                    </TableCell>
+                    {editMode && (
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => removeItem(idx)}>
+                          Remove
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+                <TableRow className="font-bold border-t-2">
+                  <TableCell colSpan={4} className="text-right">Total:</TableCell>
+                  <TableCell className="text-right">{formatCurrency(totalAmount)}</TableCell>
+                  {editMode && <TableCell></TableCell>}
+                </TableRow>
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

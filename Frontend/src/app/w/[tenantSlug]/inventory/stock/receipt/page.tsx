@@ -216,7 +216,7 @@ export default function MaterialReceiptPage() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => append({ item_code: '', qty: 1 })}
+                                        onClick={() => append({ item_code: '', qty: 1, basic_rate: 0 })}
                                     >
                                         <Plus className="h-4 w-4 mr-2" />
                                         Add Item

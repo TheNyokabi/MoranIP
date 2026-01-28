@@ -11,9 +11,14 @@ router = APIRouter(
 )
 
 
-def check_permission(payload: dict, action: str, doctype: str = ""):
-    """Check manufacturing permission."""
-    tenant_id = payload.get("tenant_id")
+def check_permission(tenant_id: str, action: str, doctype: str = ""):
+    """Check manufacturing permission.
+    
+    Args:
+        tenant_id: The tenant_id resolved by require_tenant_access (from token or X-Tenant-ID header)
+        action: The action being performed (view, create, update, delete)
+        doctype: The ERPNext doctype being accessed
+    """
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Tenant access required")
     return True
@@ -29,7 +34,7 @@ def list_work_centers(
     payload: dict = Depends(get_current_token_payload),
 ):
     """List Work Centers (Workstations)."""
-    check_permission(payload, "view", "Workstation")
+    check_permission(tenant_id, "view", "Workstation")
     result = erpnext_adapter.list_resource("Workstation", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -42,7 +47,7 @@ def create_work_center(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Create Work Center (Workstation)."""
-    check_permission(payload, "create", "Workstation")
+    check_permission(tenant_id, "create", "Workstation")
     result = erpnext_adapter.create_resource("Workstation", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -55,7 +60,7 @@ def get_work_center(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Get Work Center details."""
-    check_permission(payload, "view", "Workstation")
+    check_permission(tenant_id, "view", "Workstation")
     wc = erpnext_adapter.get_resource("Workstation", work_center_name, tenant_id)
     if not wc:
         raise HTTPException(status_code=404, detail="Work Center not found")
@@ -70,7 +75,7 @@ def update_work_center(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Update Work Center."""
-    check_permission(payload, "edit", "Workstation")
+    check_permission(tenant_id, "edit", "Workstation")
     result = erpnext_adapter.update_resource("Workstation", work_center_name, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -83,7 +88,7 @@ def delete_work_center(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Work Center."""
-    check_permission(payload, "delete", "Workstation")
+    check_permission(tenant_id, "delete", "Workstation")
     erpnext_adapter.delete_resource("Workstation", work_center_name, tenant_id)
     return None
 
@@ -95,7 +100,7 @@ def list_operations(
     payload: dict = Depends(get_current_token_payload),
 ):
     """List Operations."""
-    check_permission(payload, "view", "Operation")
+    check_permission(tenant_id, "view", "Operation")
     result = erpnext_adapter.list_resource("Operation", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -108,7 +113,7 @@ def create_operation(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Create Operation."""
-    check_permission(payload, "create", "Operation")
+    check_permission(tenant_id, "create", "Operation")
     result = erpnext_adapter.create_resource("Operation", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -121,7 +126,7 @@ def get_operation(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Get Operation details."""
-    check_permission(payload, "view", "Operation")
+    check_permission(tenant_id, "view", "Operation")
     op = erpnext_adapter.get_resource("Operation", operation_name, tenant_id)
     if not op:
         raise HTTPException(status_code=404, detail="Operation not found")
@@ -136,7 +141,7 @@ def update_operation(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Update Operation."""
-    check_permission(payload, "edit", "Operation")
+    check_permission(tenant_id, "edit", "Operation")
     result = erpnext_adapter.update_resource("Operation", operation_name, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -149,7 +154,7 @@ def delete_operation(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Operation."""
-    check_permission(payload, "delete", "Operation")
+    check_permission(tenant_id, "delete", "Operation")
     erpnext_adapter.delete_resource("Operation", operation_name, tenant_id)
     return None
 
@@ -163,7 +168,7 @@ def list_bom(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Bills of Materials."""
-    check_permission(payload, "view", "BOM")
+    check_permission(tenant_id, "view", "BOM")
     result = erpnext_adapter.list_resource("BOM", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -183,7 +188,7 @@ def create_bom(
     - quantity: 1
     - bom_details: [{item_code, qty, rate}]
     """
-    check_permission(payload, "create", "BOM")
+    check_permission(tenant_id, "create", "BOM")
     result = erpnext_adapter.create_resource("BOM", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -204,7 +209,7 @@ def get_bom(
     - Summary (total material cost, total labor cost)
     - Costing method
     """
-    check_permission(payload, "view", "BOM")
+    check_permission(tenant_id, "view", "BOM")
     bom = erpnext_adapter.get_resource("BOM", bom_name, tenant_id)
     if not bom:
         raise HTTPException(status_code=404, detail="BOM not found")
@@ -231,7 +236,7 @@ def update_bom(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update BOM details (only if not submitted)."""
-    check_permission(payload, "edit", "BOM")
+    check_permission(tenant_id, "edit", "BOM")
     result = erpnext_adapter.update_resource("BOM", bom_name, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -244,7 +249,7 @@ def submit_bom(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Submit BOM (makes it official)."""
-    check_permission(payload, "edit", "BOM")
+    check_permission(tenant_id, "edit", "BOM")
     return erpnext_adapter.proxy_request(
         tenant_id,
         f"method/run_doc_method",
@@ -263,7 +268,7 @@ def delete_bom(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete BOM (only if in draft)."""
-    check_permission(payload, "delete", "BOM")
+    check_permission(tenant_id, "delete", "BOM")
     return erpnext_adapter.delete_resource("BOM", bom_name, tenant_id)
 
 
@@ -276,7 +281,7 @@ def list_work_orders(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Work Orders."""
-    check_permission(payload, "view", "Work Order")
+    check_permission(tenant_id, "view", "Work Order")
     result = erpnext_adapter.list_resource("Work Order", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -297,7 +302,7 @@ def create_work_order(
     - bom_no: Bill of Materials
     - planned_start_date: date
     """
-    check_permission(payload, "create", "Work Order")
+    check_permission(tenant_id, "create", "Work Order")
     result = erpnext_adapter.create_resource("Work Order", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -310,7 +315,7 @@ def get_work_order(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Work Order details with progress."""
-    check_permission(payload, "view", "Work Order")
+    check_permission(tenant_id, "view", "Work Order")
     work_order = erpnext_adapter.get_resource("Work Order", work_order_id, tenant_id)
     if not work_order:
         raise HTTPException(status_code=404, detail="Work Order not found")
@@ -323,7 +328,7 @@ def update_work_order(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Work Order status or details."""
-    check_permission(payload, "edit", "Work Order")
+    check_permission(tenant_id, "edit", "Work Order")
     result = erpnext_adapter.update_resource("Work Order", work_order_id, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -338,7 +343,7 @@ def list_production_plans(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Production Plans."""
-    check_permission(payload, "view", "Production Plan")
+    check_permission(tenant_id, "view", "Production Plan")
     result = erpnext_adapter.list_resource("Production Plan", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -358,7 +363,7 @@ def create_production_plan(
     - planning_date: date
     - production_plan_details: [{item_code, planned_qty}]
     """
-    check_permission(payload, "create", "Production Plan")
+    check_permission(tenant_id, "create", "Production Plan")
     result = erpnext_adapter.create_resource("Production Plan", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -371,7 +376,7 @@ def get_production_plan(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Production Plan details."""
-    check_permission(payload, "view", "Production Plan")
+    check_permission(tenant_id, "view", "Production Plan")
     plan = erpnext_adapter.get_resource("Production Plan", plan_id, tenant_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Production Plan not found")

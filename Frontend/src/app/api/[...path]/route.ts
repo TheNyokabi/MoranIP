@@ -14,9 +14,9 @@ function buildUpstreamUrl(req: NextRequest, pathParts: string[]): string {
   return url.toString();
 }
 
-async function proxy(req: NextRequest, params: { path: string[] }) {
+async function proxy(req: NextRequest, params: Promise<{ path: string[] }>) {
   try {
-    const { path } = params;
+    const { path } = await params;
     const upstreamUrl = buildUpstreamUrl(req, path);
 
     const headers = new Headers(req.headers);
@@ -116,18 +116,18 @@ async function proxy(req: NextRequest, params: { path: string[] }) {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   return proxy(req, params);
 }
-export async function POST(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   return proxy(req, params);
 }
-export async function PUT(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   return proxy(req, params);
 }
-export async function PATCH(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   return proxy(req, params);
 }
-export async function DELETE(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   return proxy(req, params);
 }

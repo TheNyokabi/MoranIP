@@ -1,5 +1,6 @@
 """End-to-end tests for provisioning flow."""
 import pytest
+import pytest_asyncio
 from unittest.mock import patch
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ import uuid
 class TestProvisioningE2E:
     """End-to-end tests for complete provisioning flow."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def test_user(self, db: Session):
         """Create test user."""
         user = User(
@@ -28,7 +29,7 @@ class TestProvisioningE2E:
         db.refresh(user)
         return user
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def auth_token(self, async_client: AsyncClient, test_user):
         """Get auth token for test user."""
         response = await async_client.post(

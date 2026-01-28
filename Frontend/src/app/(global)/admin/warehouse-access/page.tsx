@@ -86,7 +86,7 @@ function WarehouseAccessInner() {
             headers: {
                 ...authHeaders,
                 'X-Tenant-ID': tenantId,
-            },
+            } as Record<string, string>,
         });
         if (!response.ok) {
             throw new Error('Failed to load warehouses');
@@ -96,14 +96,14 @@ function WarehouseAccessInner() {
             .map((warehouse: any) => warehouse.name || warehouse.warehouse_name)
             .filter(Boolean);
         const unique = Array.from(new Set(names)).sort();
-        setWarehouses(unique);
+        setWarehouses(unique as string[]);
     };
 
     const fetchRoleAccess = async () => {
         if (!tenantId) return;
         const response = await fetch(
             `http://localhost:9000/api/pos/warehouse-access/roles?tenant_id=${tenantId}&role_code=CASHIER`,
-            { headers: { ...authHeaders } }
+            { headers: { ...authHeaders } as Record<string, string> }
         );
         if (!response.ok) {
             throw new Error('Failed to load role access');
@@ -116,7 +116,7 @@ function WarehouseAccessInner() {
         if (!tenantId) return;
         const response = await fetch(
             `http://localhost:9000/api/pos/warehouse-access/users?tenant_id=${tenantId}&user_id=${userId}`,
-            { headers: { ...authHeaders } }
+            { headers: { ...authHeaders } as Record<string, string> }
         );
         if (!response.ok) {
             throw new Error('Failed to load user access');
@@ -154,7 +154,7 @@ function WarehouseAccessInner() {
                 headers: {
                     'Content-Type': 'application/json',
                     ...authHeaders,
-                },
+                } as Record<string, string>,
                 body: JSON.stringify({
                     role_code: 'CASHIER',
                     warehouses: roleWarehouses,
@@ -184,7 +184,7 @@ function WarehouseAccessInner() {
                 headers: {
                     'Content-Type': 'application/json',
                     ...authHeaders,
-                },
+                } as Record<string, string>,
                 body: JSON.stringify({
                     user_id: selectedUserId,
                     warehouses: userWarehouses,

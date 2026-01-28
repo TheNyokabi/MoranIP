@@ -3,7 +3,7 @@
  * Uses new /api/quality path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface QualityInspection {
     name: string;

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { authApi, Tenant, LoginResponse, TokenResponse, ApiError } from '@/lib/api'
 
 export interface AuthUser {
@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null })
                 try {
                     const response = await authApi.login(email, password)
-                    
+
                     // Decode JWT to get is_super_admin flag
                     let isSuperAdmin = false
                     if (response.access_token) {
@@ -63,19 +63,19 @@ export const useAuthStore = create<AuthState>()(
                             console.warn('Failed to decode token:', e)
                         }
                     }
-                    
+
                     // Store identity token (global, no tenant context)
                     if (response.access_token) {
                         // Set HTTP cookie for middleware
                         document.cookie = `auth_token=${response.access_token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 7 days
-                        
+
                         // Store in localStorage for compatibility
                         localStorage.setItem('token', response.access_token)
                         localStorage.setItem('access_token', response.access_token)
                         localStorage.setItem('moran_auth_token', response.access_token)
                         localStorage.setItem('moran_jwt_token', response.access_token)
                     }
-                    
+
                     set({
                         user: {
                             id: response.user_id,
@@ -202,6 +202,16 @@ export const useAuthStore = create<AuthState>()(
         }),
         {
             name: 'moran-auth',
+            storage: createJSONStorage(() => {
+                if (typeof window !== 'undefined') {
+                    return localStorage
+                }
+                return {
+                    getItem: () => null,
+                    setItem: () => { },
+                    removeItem: () => { },
+                }
+            }),
             partialize: (state) => ({
                 user: state.user,
                 token: state.token,

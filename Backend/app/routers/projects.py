@@ -10,9 +10,14 @@ router = APIRouter(
 )
 
 
-def check_permission(payload: dict, action: str, doctype: str = ""):
-    """Check projects permission."""
-    tenant_id = payload.get("tenant_id")
+def check_permission(tenant_id: str, action: str, doctype: str = ""):
+    """Check projects permission.
+    
+    Args:
+        tenant_id: The tenant_id resolved by require_tenant_access (from token or X-Tenant-ID header)
+        action: The action being performed (view, create, update, delete)
+        doctype: The ERPNext doctype being accessed
+    """
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Tenant access required")
     return True
@@ -27,7 +32,7 @@ def list_project_templates(
     payload: dict = Depends(get_current_token_payload),
 ):
     """List Project Templates."""
-    check_permission(payload, "view", "Project Template")
+    check_permission(tenant_id, "view", "Project Template")
     result = erpnext_adapter.list_resource("Project Template", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -40,7 +45,7 @@ def create_project_template(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Create Project Template."""
-    check_permission(payload, "create", "Project Template")
+    check_permission(tenant_id, "create", "Project Template")
     result = erpnext_adapter.create_resource("Project Template", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -53,7 +58,7 @@ def get_project_template(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Get Project Template details."""
-    check_permission(payload, "view", "Project Template")
+    check_permission(tenant_id, "view", "Project Template")
     template = erpnext_adapter.get_resource("Project Template", template_name, tenant_id)
     if not template:
         raise HTTPException(status_code=404, detail="Project Template not found")
@@ -68,7 +73,7 @@ def update_project_template(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Update Project Template."""
-    check_permission(payload, "edit", "Project Template")
+    check_permission(tenant_id, "edit", "Project Template")
     result = erpnext_adapter.update_resource("Project Template", template_name, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -81,7 +86,7 @@ def delete_project_template(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Project Template."""
-    check_permission(payload, "delete", "Project Template")
+    check_permission(tenant_id, "delete", "Project Template")
     erpnext_adapter.delete_resource("Project Template", template_name, tenant_id)
     return None
 
@@ -99,7 +104,7 @@ def list_projects(
     
     Query parameters: status (Active|Completed|Closed), customer
     """
-    check_permission(payload, "view", "Project")
+    check_permission(tenant_id, "view", "Project")
     result = erpnext_adapter.list_resource("Project", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -120,7 +125,7 @@ def create_project(
     - status: "Active" | "Completed" | "Closed"
     - start_date: date
     """
-    check_permission(payload, "create", "Project")
+    check_permission(tenant_id, "create", "Project")
     result = erpnext_adapter.create_resource("Project", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -133,7 +138,7 @@ def get_project(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Project details including tasks and progress."""
-    check_permission(payload, "view", "Project")
+    check_permission(tenant_id, "view", "Project")
     project = erpnext_adapter.get_resource("Project", project_name, tenant_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -146,7 +151,7 @@ def update_project(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Project details (status, dates, etc)."""
-    check_permission(payload, "edit", "Project")
+    check_permission(tenant_id, "edit", "Project")
     result = erpnext_adapter.update_resource("Project", project_name, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -165,7 +170,7 @@ def list_tasks(
     
     Can filter by project or status
     """
-    check_permission(payload, "view", "Task")
+    check_permission(tenant_id, "view", "Task")
     result = erpnext_adapter.list_resource("Task", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -186,7 +191,7 @@ def create_task(
     - assigned_to: User email
     - status: "Open" | "Working" | "Completed" | "Closed"
     """
-    check_permission(payload, "create", "Task")
+    check_permission(tenant_id, "create", "Task")
     result = erpnext_adapter.create_resource("Task", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -199,7 +204,7 @@ def get_task(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Task details with progress and assignments."""
-    check_permission(payload, "view", "Task")
+    check_permission(tenant_id, "view", "Task")
     task = erpnext_adapter.get_resource("Task", task_name, tenant_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -212,7 +217,7 @@ def update_task(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Task (status, assignments, dates, etc)."""
-    check_permission(payload, "edit", "Task")
+    check_permission(tenant_id, "edit", "Task")
     result = erpnext_adapter.update_resource("Task", task_name, data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -227,7 +232,7 @@ def list_timesheets(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Timesheets for time tracking."""
-    check_permission(payload, "view", "Timesheet")
+    check_permission(tenant_id, "view", "Timesheet")
     result = erpnext_adapter.list_resource("Timesheet", tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -247,7 +252,7 @@ def create_timesheet(
     - start_date: date
     - time_logs: [{task, hours, completed}]
     """
-    check_permission(payload, "create", "Timesheet")
+    check_permission(tenant_id, "create", "Timesheet")
     result = erpnext_adapter.create_resource("Timesheet", data, tenant_id)
 
     return ResponseNormalizer.normalize_erpnext(result)
@@ -260,7 +265,7 @@ def get_timesheet(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Timesheet with detailed time logs."""
-    check_permission(payload, "view", "Timesheet")
+    check_permission(tenant_id, "view", "Timesheet")
     timesheet = erpnext_adapter.get_resource("Timesheet", timesheet_name, tenant_id)
     if not timesheet:
         raise HTTPException(status_code=404, detail="Timesheet not found")

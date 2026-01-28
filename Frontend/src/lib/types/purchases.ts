@@ -37,11 +37,15 @@ export interface SuppliersQuery {
 
 export interface PurchaseOrder {
     id: string;
+    name?: string;  // ERPNext document name
     supplier_id: string;
+    supplier_name?: string;  // Linked supplier name
     order_date: string;
+    transaction_date?: string;  // ERPNext transaction date
     currency: string;
     status?: string;
     total_amount?: number;
+    grand_total?: number;  // ERPNext grand total
     items: PurchaseOrderItem[];
     created_at?: string;
     modified_at?: string;
@@ -109,12 +113,22 @@ export interface ReceiptsQuery {
 
 export interface PurchaseInvoice {
     id: string;
+    name?: string;  // ERPNext document name
     supplier_id: string;
+    supplier_name?: string;  // Linked supplier name
     bill_no: string;
     bill_date: string;
+    invoice_date?: string;  // Alternative date field
+    posting_date?: string;  // ERPNext posting date
+    due_date?: string;
     items: PurchaseInvoiceItem[];
     total_amount?: number;
+    grand_total?: number;  // ERPNext grand total
+    outstanding_amount?: number;
+    status?: string;
+    currency?: string;
     created_at?: string;
+    modified_at?: string;
 }
 
 export interface PurchaseInvoiceItem {

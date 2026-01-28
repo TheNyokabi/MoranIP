@@ -85,7 +85,7 @@ export default function EmployeesListPage() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
-    const departments = [...new Set(mockEmployees.map((e) => e.department))];
+    const departments = Array.from(new Set(mockEmployees.map((e) => e.department)));
 
     const filteredEmployees = mockEmployees.filter((employee) => {
         const matchesSearch = employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

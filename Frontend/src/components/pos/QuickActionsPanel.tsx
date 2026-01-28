@@ -41,19 +41,20 @@ interface SearchResult {
   stock_uom: string
 }
 
-interface QuickActionsPanelProps {
+export interface QuickActionsPanelProps {
   posProfileId: string
-  onAddItem: (item: any) => void
-  onSelectCustomer: (customer: string) => void
-  onQuickSale: (preset: any) => void
+  onItemAdd: (item: any) => void
+  onCustomerSelect: (customer: any) => void
+  onQuickSale: (data: any) => void
+  onBarcodeScan: (barcode: any) => void
   onRepeatSale: (saleData: any) => void
   onBulkAdd: (items: any[]) => void
 }
 
 export function QuickActionsPanel({
   posProfileId,
-  onAddItem,
-  onSelectCustomer,
+  onItemAdd,
+  onCustomerSelect,
   onQuickSale,
   onRepeatSale,
   onBulkAdd
@@ -84,7 +85,7 @@ export function QuickActionsPanel({
         {},
         token
       )
-      setFrequentItems(response.frequent_items || [])
+      setFrequentItems((response as any).frequent_items || [])
     } catch (error) {
       console.error('Failed to load frequent items:', error)
       toast({
@@ -102,7 +103,7 @@ export function QuickActionsPanel({
         {},
         token
       )
-      setRecentCustomers(response.recent_customers || [])
+      setRecentCustomers((response as any).recent_customers || [])
     } catch (error) {
       console.error('Failed to load recent customers:', error)
       toast({
@@ -126,7 +127,7 @@ export function QuickActionsPanel({
         {},
         token
       )
-      setSearchResults(response.search_results || [])
+      setSearchResults((response as any).search_results || [])
     } catch (error) {
       console.error('Search failed:', error)
       toast({
@@ -163,10 +164,11 @@ export function QuickActionsPanel({
         })
       }, token)
 
-      onQuickSale(response.preset)
+      const res = response as any;
+      onQuickSale(res.preset)
       toast({
         title: "Quick Sale",
-        description: `${response.preset.name} ready for checkout`
+        description: `${res.preset.name} ready for checkout`
       })
     } catch (error) {
       console.error('Quick sale failed:', error)
@@ -191,7 +193,7 @@ export function QuickActionsPanel({
         })
       }, token)
 
-      onRepeatSale(response.last_sale)
+      onRepeatSale((response as any).last_sale)
       toast({
         title: "Repeat Sale",
         description: `Last sale for ${customer} loaded`
@@ -227,10 +229,11 @@ export function QuickActionsPanel({
         })
       }, token)
 
-      onBulkAdd(response.items)
+      const res = response as any;
+      onBulkAdd(res.items)
       toast({
         title: "Bulk Add",
-        description: `Added ${response.total_items} items to cart`
+        description: `Added ${res.total_items} items to cart`
       })
     } catch (error) {
       console.error('Bulk add failed:', error)
@@ -343,7 +346,7 @@ export function QuickActionsPanel({
                     <div
                       key={item.item_code}
                       className="flex items-center justify-between p-2 rounded-lg border hover:bg-accent cursor-pointer"
-                      onClick={() => onAddItem({
+                      onClick={() => onItemAdd({
                         item_code: item.item_code,
                         item_name: item.item_name,
                         rate: item.standard_rate,
@@ -385,7 +388,7 @@ export function QuickActionsPanel({
                   <div
                     key={customer.customer}
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer"
-                    onClick={() => onSelectCustomer(customer.customer)}
+                    onClick={() => onCustomerSelect(customer.customer)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -452,7 +455,7 @@ export function QuickActionsPanel({
                     <div
                       key={item.item_code}
                       className="flex items-center justify-between p-2 rounded-lg border hover:bg-accent cursor-pointer"
-                      onClick={() => onAddItem({
+                      onClick={() => onItemAdd({
                         item_code: item.item_code,
                         item_name: item.item_name,
                         rate: item.standard_rate,

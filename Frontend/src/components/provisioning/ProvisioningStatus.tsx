@@ -76,9 +76,9 @@ export function ProvisioningStatus({
                 onComplete();
             } else if (data.status === 'FAILED' && onError && !hasNotifiedError && previousStatus !== 'FAILED') {
                 setHasNotifiedError(true);
-                const errorMsg = data.errors && data.errors.length > 0 
+                const errorMsg = data.errors && data.errors.length > 0
                     ? `${data.errors[0]?.step || 'Unknown step'}: ${data.errors[0]?.error || 'Provisioning failed'}`
-                    : data.message || 'Provisioning failed';
+                    : (data as any).message || 'Provisioning failed';
                 onError(errorMsg);
             } else if (data.status === 'PARTIAL' && previousStatus !== 'PARTIAL') {
                 // PARTIAL status means provisioning completed but with non-critical warnings
@@ -92,7 +92,7 @@ export function ProvisioningStatus({
                 // Reset error notification flag since PARTIAL is not an error
                 setHasNotifiedError(false);
             }
-            
+
             // Reset notification flags if status changes back to in progress
             if (data.status === 'IN_PROGRESS' && (previousStatus === 'FAILED' || previousStatus === 'PARTIAL')) {
                 setHasNotifiedError(false);
@@ -303,12 +303,12 @@ export function ProvisioningStatus({
                             {status.status === 'COMPLETED'
                                 ? 'Workspace is ready for POS operations'
                                 : status.status === 'FAILED'
-                                ? 'Provisioning encountered errors'
-                                : status.status === 'PARTIAL'
-                                ? 'Provisioning completed with warnings. Workspace is functional but some optional steps may have failed.'
-                                : status.status === 'IN_PROGRESS'
-                                ? `Step ${status.steps_completed + 1} of ${status.total_steps}: ${STEP_NAMES[status.current_step || ''] || status.current_step}`
-                                : 'Provisioning not started'}
+                                    ? 'Provisioning encountered errors'
+                                    : status.status === 'PARTIAL'
+                                        ? 'Provisioning completed with warnings. Workspace is functional but some optional steps may have failed.'
+                                        : status.status === 'IN_PROGRESS'
+                                            ? `Step ${status.steps_completed + 1} of ${status.total_steps}: ${STEP_NAMES[status.current_step || ''] || status.current_step}`
+                                            : 'Provisioning not started'}
                         </CardDescription>
                     </div>
                     {status.status === 'IN_PROGRESS' && (
@@ -360,7 +360,7 @@ export function ProvisioningStatus({
                 {(status.errors && status.errors.length > 0) || (status.status === 'FAILED' && (!status.errors || status.errors.length === 0)) ? (
                     <div className={cn(
                         "rounded-lg border p-3",
-                        status.status === 'PARTIAL' 
+                        status.status === 'PARTIAL'
                             ? "border-amber-500/50 bg-amber-500/10"
                             : "border-destructive/50 bg-destructive/10"
                     )}>
@@ -396,7 +396,7 @@ export function ProvisioningStatus({
                                 "text-sm",
                                 status.status === 'PARTIAL' ? "text-amber-400" : "text-destructive"
                             )}>
-                                {status.status === 'PARTIAL' 
+                                {status.status === 'PARTIAL'
                                     ? 'Provisioning completed with warnings. Workspace is functional but some optional steps may have failed.'
                                     : `Provisioning failed. ${status.current_step ? `Last attempted step: ${STEP_NAMES[status.current_step] || status.current_step}` : 'Please check the logs for details.'}`
                                 }

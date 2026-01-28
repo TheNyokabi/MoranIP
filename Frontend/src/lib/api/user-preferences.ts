@@ -1,6 +1,8 @@
 // User Preferences API Client
 // Handles favorites, recent workspaces, and dashboard settings
 
+import { apiFetch } from './core';
+
 export interface UserPreferences {
     favorite_workspaces: string[];
     recent_workspaces: string[];
@@ -18,121 +20,83 @@ export interface UpdatePreferences {
     language?: string;
 }
 
+/**
+ * Get current user's preferences
+ */
+export async function getPreferences(token?: string): Promise<UserPreferences> {
+    return apiFetch<UserPreferences>('/users/preferences', {}, token);
+}
+
+/**
+ * Update user preferences (partial update)
+ */
+export async function updatePreferences(updates: UpdatePreferences, token?: string): Promise<UserPreferences> {
+    return apiFetch<UserPreferences>('/users/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+    }, token);
+}
+
+/**
+ * Toggle a workspace as favorite
+ */
+export async function toggleFavorite(tenantId: string, token?: string): Promise<UserPreferences> {
+    return apiFetch<UserPreferences>(`/users/preferences/favorites/toggle?tenant_id=${tenantId}`, {
+        method: 'POST',
+    }, token);
+}
+
+/**
+ * Add workspace to recent list
+ */
+export async function addRecent(tenantId: string, token?: string): Promise<UserPreferences> {
+    return apiFetch<UserPreferences>(`/users/preferences/recents/add?tenant_id=${tenantId}`, {
+        method: 'POST',
+    }, token);
+}
+
+/**
+ * Remove workspace from favorites
+ */
+export async function removeFavorite(tenantId: string, token?: string): Promise<UserPreferences> {
+    return apiFetch<UserPreferences>(`/users/preferences/favorites/${tenantId}`, {
+        method: 'DELETE',
+    }, token);
+}
+
+/**
+ * Clear all recent workspaces
+ */
+export async function clearRecents(token?: string): Promise<UserPreferences> {
+    return apiFetch<UserPreferences>('/users/preferences/recents/clear', {
+        method: 'DELETE',
+    }, token);
+}
+
+// Legacy class-based API for backward compatibility
 class UserPreferencesApi {
-    private baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
-
-    /**
-     * Get current user's preferences
-     */
     async getPreferences(token: string): Promise<UserPreferences> {
-        const response = await fetch(`${this.baseUrl}/api/users/preferences`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to fetch preferences');
-        }
-
-        return response.json();
+        return getPreferences(token);
     }
 
-    /**
-     * Update user preferences (partial update)
-     */
     async updatePreferences(token: string, updates: UpdatePreferences): Promise<UserPreferences> {
-        const response = await fetch(`${this.baseUrl}/api/users/preferences`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updates),
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to update preferences');
-        }
-
-        return response.json();
+        return updatePreferences(updates, token);
     }
 
-    /**
-     * Toggle a workspace as favorite
-     */
     async toggleFavorite(token: string, tenantId: string): Promise<UserPreferences> {
-        const response = await fetch(`${this.baseUrl}/api/users/preferences/favorites/toggle?tenant_id=${tenantId}`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to toggle favorite');
-        }
-
-        return response.json();
+        return toggleFavorite(tenantId, token);
     }
 
-    /**
-     * Add workspace to recent list
-     */
     async addRecent(token: string, tenantId: string): Promise<UserPreferences> {
-        const response = await fetch(`${this.baseUrl}/api/users/preferences/recents/add?tenant_id=${tenantId}`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to add recent workspace');
-        }
-
-        return response.json();
+        return addRecent(tenantId, token);
     }
 
-    /**
-     * Remove workspace from favorites
-     */
     async removeFavorite(token: string, tenantId: string): Promise<UserPreferences> {
-        const response = await fetch(`${this.baseUrl}/api/users/preferences/favorites/${tenantId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to remove favorite');
-        }
-
-        return response.json();
+        return removeFavorite(tenantId, token);
     }
 
-    /**
-     * Clear all recent workspaces
-     */
     async clearRecents(token: string): Promise<UserPreferences> {
-        const response = await fetch(`${this.baseUrl}/api/users/preferences/recents/clear`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to clear recents');
-        }
-
-        return response.json();
+        return clearRecents(token);
     }
 }
 

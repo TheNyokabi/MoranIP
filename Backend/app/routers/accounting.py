@@ -11,9 +11,14 @@ router = APIRouter(
 )
 
 
-def check_permission(payload: dict, action: str, doctype: str = ""):
-    """Check accounting permission."""
-    tenant_id = payload.get("tenant_id")
+def check_permission(tenant_id: str, action: str, doctype: str = ""):
+    """Check accounting permission.
+    
+    Args:
+        tenant_id: The tenant_id resolved by require_tenant_access (from token or X-Tenant-ID header)
+        action: The action being performed (view, create, update, delete)
+        doctype: The ERPNext doctype being accessed
+    """
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Tenant access required")
     return True
@@ -32,7 +37,7 @@ def list_gl_entries(
     
     Query parameters: filters, fields, limit_page_length
     """
-    check_permission(payload, "view", "GL Entry")
+    check_permission(tenant_id, "view", "GL Entry")
     params = dict(request.query_params)
     voucher_no = params.pop("voucher_no", None)
     voucher_type = params.pop("voucher_type", None)
@@ -60,7 +65,7 @@ def create_gl_entry(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Create GL Entry."""
-    check_permission(payload, "create", "GL Entry")
+    check_permission(tenant_id, "create", "GL Entry")
     result = erpnext_adapter.create_resource("GL Entry", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -72,7 +77,7 @@ def get_gl_entry(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get GL Entry details."""
-    check_permission(payload, "view", "GL Entry")
+    check_permission(tenant_id, "view", "GL Entry")
     result = erpnext_adapter.get_resource("GL Entry", entry_id, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -86,7 +91,7 @@ def list_journals(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Journal Entries."""
-    check_permission(payload, "view", "Journal Entry")
+    check_permission(tenant_id, "view", "Journal Entry")
     result = erpnext_adapter.list_resource("Journal Entry", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -105,7 +110,7 @@ def create_journal(
     - posting_date: date
     - accounts: List[{account: str, debit: float, credit: float}]
     """
-    check_permission(payload, "create", "Journal Entry")
+    check_permission(tenant_id, "create", "Journal Entry")
     result = erpnext_adapter.create_resource("Journal Entry", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -124,7 +129,7 @@ def get_journal(
     - Accounts with enriched details (account_name, cost_center)
     - Summary (total debit, total credit, difference)
     """
-    check_permission(payload, "view", "Journal Entry")
+    check_permission(tenant_id, "view", "Journal Entry")
     journal = erpnext_adapter.get_resource("Journal Entry", journal_id, tenant_id)
     
     if not journal:
@@ -153,7 +158,7 @@ def update_journal(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Journal Entry (only if Draft)."""
-    check_permission(payload, "edit", "Journal Entry")
+    check_permission(tenant_id, "edit", "Journal Entry")
     result = erpnext_adapter.update_resource("Journal Entry", journal_id, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -165,7 +170,7 @@ def submit_journal(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Submit Journal Entry."""
-    check_permission(payload, "edit", "Journal Entry")
+    check_permission(tenant_id, "edit", "Journal Entry")
     
     journal = erpnext_adapter.get_resource("Journal Entry", journal_id, tenant_id)
     if not journal:
@@ -193,7 +198,7 @@ def delete_journal(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete Journal Entry (only if Draft)."""
-    check_permission(payload, "delete", "Journal Entry")
+    check_permission(tenant_id, "delete", "Journal Entry")
     
     journal = erpnext_adapter.get_resource("Journal Entry", journal_id, tenant_id)
     if not journal:
@@ -219,7 +224,7 @@ def list_payments(
     
     Payment Entry can be for Customer or Supplier
     """
-    check_permission(payload, "view", "Payment Entry")
+    check_permission(tenant_id, "view", "Payment Entry")
     result = erpnext_adapter.list_resource("Payment Entry", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -240,7 +245,7 @@ def create_payment(
     - posting_date: date
     - paid_amount: float
     """
-    check_permission(payload, "create", "Payment Entry")
+    check_permission(tenant_id, "create", "Payment Entry")
     result = erpnext_adapter.create_resource("Payment Entry", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -252,7 +257,7 @@ def get_payment(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Payment Entry details."""
-    check_permission(payload, "view", "Payment Entry")
+    check_permission(tenant_id, "view", "Payment Entry")
     result = erpnext_adapter.get_resource("Payment Entry", payment_id, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -270,7 +275,7 @@ def list_accounts(
     
     Query parameters: company (required for filtering)
     """
-    check_permission(payload, "view", "Account")
+    check_permission(tenant_id, "view", "Account")
     result = erpnext_adapter.list_resource("Account", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -291,7 +296,7 @@ def create_account(
     - parent_account: str (optional, for hierarchy)
     - is_group: bool (default: false)
     """
-    check_permission(payload, "create", "Account")
+    check_permission(tenant_id, "create", "Account")
     result = erpnext_adapter.create_resource("Account", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -310,7 +315,7 @@ def list_chart_of_accounts(
     - is_group: filter by group status
     - company: filter by company
     """
-    check_permission(payload, "view", "Account")
+    check_permission(tenant_id, "view", "Account")
     result = erpnext_adapter.list_resource("Account", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -322,7 +327,7 @@ def get_account(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Account details including balance, hierarchy, and settings."""
-    check_permission(payload, "view", "Account")
+    check_permission(tenant_id, "view", "Account")
     account = erpnext_adapter.get_resource("Account", account_name, tenant_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -344,7 +349,7 @@ def update_account(
     - parent_account: str
     - disabled: bool
     """
-    check_permission(payload, "update", "Account")
+    check_permission(tenant_id, "update", "Account")
     updated_account = erpnext_adapter.update_resource("Account", account_name, data, tenant_id)
     if not updated_account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -358,7 +363,7 @@ def delete_account(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete Chart of Account entry (if no transactions exist)."""
-    check_permission(payload, "delete", "Account")
+    check_permission(tenant_id, "delete", "Account")
     erpnext_adapter.delete_resource("Account", account_name, tenant_id)
     return None
 
@@ -370,7 +375,7 @@ def get_account_legacy(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Account details including balance (legacy endpoint)."""
-    check_permission(payload, "view", "Account")
+    check_permission(tenant_id, "view", "Account")
     account = erpnext_adapter.get_resource("Account", account_name, tenant_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -386,7 +391,7 @@ def list_companies(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List all companies for this tenant."""
-    check_permission(payload, "view", "Company")
+    check_permission(tenant_id, "view", "Company")
     result = erpnext_adapter.list_resource("Company", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -407,7 +412,7 @@ def create_company(
     - default_currency: str (e.g., "KES")
     - company_type: str (Individual, Partnership, Private Limited, Public Limited, Cooperative)
     """
-    check_permission(payload, "create", "Company")
+    check_permission(tenant_id, "create", "Company")
     result = erpnext_adapter.create_resource("Company", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -419,7 +424,7 @@ def get_company(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get company details including financial year, accounting settings."""
-    check_permission(payload, "view", "Company")
+    check_permission(tenant_id, "view", "Company")
     company = erpnext_adapter.get_resource("Company", company_name, tenant_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -446,7 +451,7 @@ def update_company(
     - city: str
     - postal_code: str
     """
-    check_permission(payload, "update", "Company")
+    check_permission(tenant_id, "update", "Company")
     updated_company = erpnext_adapter.update_resource("Company", company_name, data, tenant_id)
     if not updated_company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -462,7 +467,7 @@ def list_sales_invoices(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Sales Invoices."""
-    check_permission(payload, "view", "Sales Invoice")
+    check_permission(tenant_id, "view", "Sales Invoice")
     result = erpnext_adapter.list_resource("Sales Invoice", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -474,7 +479,7 @@ def create_sales_invoice(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Create Sales Invoice."""
-    check_permission(payload, "create", "Sales Invoice")
+    check_permission(tenant_id, "create", "Sales Invoice")
     result = erpnext_adapter.create_resource("Sales Invoice", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -486,7 +491,7 @@ def get_sales_invoice(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Sales Invoice with full details including items, customer, taxes."""
-    check_permission(payload, "view", "Sales Invoice")
+    check_permission(tenant_id, "view", "Sales Invoice")
     invoice = erpnext_adapter.get_resource("Sales Invoice", invoice_id, tenant_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Sales Invoice not found")
@@ -516,7 +521,7 @@ def update_sales_invoice(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Sales Invoice (only in Draft status)."""
-    check_permission(payload, "write", "Sales Invoice")
+    check_permission(tenant_id, "write", "Sales Invoice")
     
     # Verify invoice exists and is in draft status
     invoice = erpnext_adapter.get_resource("Sales Invoice", invoice_id, tenant_id)
@@ -537,7 +542,7 @@ def submit_sales_invoice(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Submit Sales Invoice (Draft → Submitted)."""
-    check_permission(payload, "submit", "Sales Invoice")
+    check_permission(tenant_id, "submit", "Sales Invoice")
     
     # Use ERPNext's submit endpoint
     result = erpnext_adapter.call_method(
@@ -555,7 +560,7 @@ def amend_sales_invoice(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Create amended copy of submitted Sales Invoice."""
-    check_permission(payload, "create", "Sales Invoice")
+    check_permission(tenant_id, "create", "Sales Invoice")
     
     result = erpnext_adapter.call_method(
         "frappe.client.get_value",
@@ -581,7 +586,7 @@ def delete_sales_invoice(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete Sales Invoice (only if Draft)."""
-    check_permission(payload, "delete", "Sales Invoice")
+    check_permission(tenant_id, "delete", "Sales Invoice")
     
     invoice = erpnext_adapter.get_resource("Sales Invoice", invoice_id, tenant_id)
     if not invoice:
@@ -603,7 +608,7 @@ def list_payment_entries(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Payment Entries."""
-    check_permission(payload, "view", "Payment Entry")
+    check_permission(tenant_id, "view", "Payment Entry")
     result = erpnext_adapter.list_resource("Payment Entry", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -624,7 +629,7 @@ def create_payment_entry(
     - posting_date: date
     - reference_no: str
     """
-    check_permission(payload, "create", "Payment Entry")
+    check_permission(tenant_id, "create", "Payment Entry")
     result = erpnext_adapter.create_resource("Payment Entry", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -643,7 +648,7 @@ def get_payment_entry(
     - Allocated invoices with original amounts
     - Payment method details
     """
-    check_permission(payload, "view", "Payment Entry")
+    check_permission(tenant_id, "view", "Payment Entry")
     
     payment = erpnext_adapter.get_resource("Payment Entry", payment_id, tenant_id)
     if not payment:
@@ -672,7 +677,7 @@ def update_payment_entry(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Payment Entry (only if Draft)."""
-    check_permission(payload, "edit", "Payment Entry")
+    check_permission(tenant_id, "edit", "Payment Entry")
     result = erpnext_adapter.update_resource("Payment Entry", payment_id, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -684,7 +689,7 @@ def submit_payment_entry(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Submit Payment Entry."""
-    check_permission(payload, "edit", "Payment Entry")
+    check_permission(tenant_id, "edit", "Payment Entry")
     
     payment = erpnext_adapter.get_resource("Payment Entry", payment_id, tenant_id)
     if not payment:
@@ -711,7 +716,7 @@ def delete_payment_entry(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete Payment Entry (only if Draft)."""
-    check_permission(payload, "delete", "Payment Entry")
+    check_permission(tenant_id, "delete", "Payment Entry")
     
     payment = erpnext_adapter.get_resource("Payment Entry", payment_id, tenant_id)
     if not payment:

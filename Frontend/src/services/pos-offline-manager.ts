@@ -151,7 +151,7 @@ class POSOfflineManager {
       const response = await apiFetch('/pos/sync/test-connectivity', {}, localStorage.getItem('authToken') || '')
       const wasOnline = this.isOnline
 
-      this.isOnline = response.connectivity_test.overall
+      this.isOnline = (response as any).connectivity_test.overall
 
       if (!wasOnline && this.isOnline) {
         this.handleOnline()
@@ -160,7 +160,7 @@ class POSOfflineManager {
       }
 
       // Store connectivity status
-      await this.setSyncMetadata('connectivityStatus', response.connectivity_test)
+      await this.setSyncMetadata('connectivityStatus', (response as any).connectivity_test)
 
     } catch (error) {
       // If connectivity test fails, we're likely offline
@@ -561,4 +561,3 @@ class POSOfflineManager {
 export const offlineManager = new POSOfflineManager()
 
 // Export types
-export type { SyncStatus }

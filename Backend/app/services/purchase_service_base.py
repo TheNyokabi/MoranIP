@@ -168,6 +168,50 @@ class PurchaseServiceBase(ABC):
         """Get purchase receipt details"""
         pass
     
+    @abstractmethod
+    async def update_purchase_receipt(
+        self,
+        tenant_id: str,
+        receipt_id: str,
+        data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update a purchase receipt (only allowed in Draft status).
+        
+        Can update:
+        - Items (quantities, warehouses, rates)
+        - Posting date
+        - Other metadata
+        """
+        pass
+    
+    @abstractmethod
+    async def submit_purchase_receipt(
+        self,
+        tenant_id: str,
+        receipt_id: str
+    ) -> Dict[str, Any]:
+        """
+        Submit purchase receipt to update inventory.
+        
+        This is a critical step that:
+        1. Validates the receipt data
+        2. Creates Stock Ledger Entries
+        3. Updates inventory quantities in warehouses
+        
+        The receipt must be in Draft status to be submitted.
+        """
+        pass
+    
+    @abstractmethod
+    async def cancel_purchase_receipt(
+        self,
+        tenant_id: str,
+        receipt_id: str
+    ) -> Dict[str, Any]:
+        """Cancel a submitted purchase receipt (reverses stock entries)"""
+        pass
+    
     # ==================== Purchase Invoice Operations ====================
     
     @abstractmethod

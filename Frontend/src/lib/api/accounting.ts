@@ -3,7 +3,7 @@
  * Uses new /api/accounting path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface Account {
     name: string;
@@ -53,7 +53,7 @@ export interface PaymentEntry {
     docstatus: number;
 }
 
-export interface SalesInvoice {
+export interface AccountingSalesInvoice {
     name: string;
     posting_date: string;
     customer: string;
@@ -168,19 +168,19 @@ export const accountingApi = {
         }),
 
     // Sales Invoices
-    listSalesInvoices: (): Promise<{ data: SalesInvoice[] }> =>
+    listSalesInvoices: (): Promise<{ data: AccountingSalesInvoice[] }> =>
         apiFetch('/api/accounting/sales-invoices'),
 
-    createSalesInvoice: (data: Partial<SalesInvoice>): Promise<{ data: SalesInvoice }> =>
+    createSalesInvoice: (data: Partial<AccountingSalesInvoice>): Promise<{ data: AccountingSalesInvoice }> =>
         apiFetch('/api/accounting/sales-invoices', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
 
-    getSalesInvoice: (invoiceId: string): Promise<{ data: SalesInvoice }> =>
+    getSalesInvoice: (invoiceId: string): Promise<{ data: AccountingSalesInvoice }> =>
         apiFetch(`/api/accounting/sales-invoices/${invoiceId}`),
 
-    updateSalesInvoice: (invoiceId: string, data: Partial<SalesInvoice>): Promise<{ data: SalesInvoice }> =>
+    updateSalesInvoice: (invoiceId: string, data: Partial<AccountingSalesInvoice>): Promise<{ data: AccountingSalesInvoice }> =>
         apiFetch(`/api/accounting/sales-invoices/${invoiceId}`, {
             method: 'PUT',
             body: JSON.stringify(data),

@@ -71,11 +71,11 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
   const validatePhoneNumber = (number: string) => {
     const cleaned = number.replace(/\D/g, '')
     const kenyaPrefixes = ['700', '701', '702', '703', '704', '705', '706', '707', '708', '709',
-                          '710', '711', '712', '713', '714', '715', '716', '717', '718', '719',
-                          '720', '721', '722', '723', '724', '725', '726', '727', '728', '729',
-                          '730', '731', '740', '741', '742', '743', '744', '745', '746', '747',
-                          '748', '749', '750', '751', '752', '753', '754', '755', '756', '757',
-                          '758', '759']
+      '710', '711', '712', '713', '714', '715', '716', '717', '718', '719',
+      '720', '721', '722', '723', '724', '725', '726', '727', '728', '729',
+      '730', '731', '740', '741', '742', '743', '744', '745', '746', '747',
+      '748', '749', '750', '751', '752', '753', '754', '755', '756', '757',
+      '758', '759']
 
     if (cleaned.startsWith('254') && cleaned.length === 12) {
       const prefix = cleaned.slice(3, 6)
@@ -145,10 +145,12 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
         })
       }, token)
 
-      if (response.status === 'completed') {
+      const res = response as any;
+
+      if (res.status === 'completed') {
         setStatus('completed')
         onSuccess({
-          ...response,
+          ...res,
           phone_number: phoneNumber,
           amount: amount
         })
@@ -157,7 +159,7 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
           title: "Payment Successful",
           description: `KES ${amount} received from ${phoneNumber}`
         })
-      } else if (response.status === 'failed') {
+      } else if (res.status === 'failed') {
         setStatus('failed')
         setErrorMessage('Payment was declined or failed')
       }
@@ -249,8 +251,8 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
 
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Invoice:</strong> {invoiceId}<br/>
-                  <strong>Amount:</strong> KES {amount}<br/>
+                  <strong>Invoice:</strong> {invoiceId}<br />
+                  <strong>Amount:</strong> KES {amount}<br />
                   <strong>Processing Fee:</strong> Free
                 </p>
               </div>
@@ -261,8 +263,8 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
             <div className="space-y-3">
               <div className="bg-yellow-50 p-3 rounded-lg">
                 <p className="text-sm text-yellow-800">
-                  <strong>STK Push sent to:</strong> {phoneNumber}<br/>
-                  <strong>Reference:</strong> {paymentData.checkout_request_id}<br/>
+                  <strong>STK Push sent to:</strong> {phoneNumber}<br />
+                  <strong>Reference:</strong> {paymentData.checkout_request_id}<br />
                   <strong>Expires in:</strong> {formatTime(timeLeft)}
                 </p>
               </div>
@@ -282,7 +284,7 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
                 <p className="text-green-800 font-medium">Payment Successful!</p>
                 <p className="text-sm text-green-700">
-                  KES {amount} received<br/>
+                  KES {amount} received<br />
                   Transaction: {paymentData?.mpesa_receipt_number || 'Processing'}
                 </p>
               </div>
@@ -308,10 +310,10 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
                 </Button>
                 <Button
                   onClick={initiatePayment}
-                  disabled={!validatePhoneNumber(phoneNumber) || status === 'initiating'}
+                  disabled={!validatePhoneNumber(phoneNumber) || (status as string) === 'initiating'}
                   className="flex-1"
                 >
-                  {status === 'initiating' ? (
+                  {(status as string) === 'initiating' ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : null}
                   Pay Now
@@ -346,7 +348,7 @@ export function MpesaPaymentModal({ amount, invoiceId, customerName, onSuccess, 
           {/* Kenya M-Pesa Info */}
           <div className="bg-gray-50 p-3 rounded-lg mt-4">
             <p className="text-xs text-gray-600 text-center">
-              Powered by M-Pesa. Secure payment processing.<br/>
+              Powered by M-Pesa. Secure payment processing.<br />
               Supported prefixes: 0700-0731, 0740-0759
             </p>
           </div>

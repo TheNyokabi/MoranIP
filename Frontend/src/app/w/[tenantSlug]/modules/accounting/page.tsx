@@ -14,7 +14,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Zap, FileText, CreditCard, DollarSign, Receipt, Plus, Edit2, Trash2 } from 'lucide-react';
-import { accountingApi, type GLEntry, type JournalEntry, type PaymentEntry, type Account, type SalesInvoice } from '@/lib/api';
+import { accountingApi, type GLEntry, type JournalEntry, type PaymentEntry, type Account, type AccountingSalesInvoice } from '@/lib/api';
 import { ErrorHandler } from '@/components/error-handler';
 import { DataTable } from '@/components/data-table';
 import { DeleteDialog } from '@/components/crud/delete-dialog';
@@ -67,7 +67,7 @@ export default function AccountingPage() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [paymentEntries, setPaymentEntries] = useState<PaymentEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
+  const [salesInvoices, setSalesInvoices] = useState<AccountingSalesInvoice[]>([]);
 
   // Dialog states
   const [journalDialogOpen, setJournalDialogOpen] = useState(false);
@@ -145,7 +145,14 @@ export default function AccountingPage() {
 
   const handleCreateJournal = async (data: JournalEntryFormValues) => {
     try {
-      await accountingApi.createJournalEntry(data);
+      await accountingApi.createJournalEntry({
+        ...data,
+        accounts: data.accounts.map(a => ({
+          ...a,
+          debit: a.debit || 0,
+          credit: a.credit || 0
+        }))
+      });
       toast({ title: 'Success', description: 'Journal entry created successfully' });
       setJournalDialogOpen(false);
       journalForm.reset();

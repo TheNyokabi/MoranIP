@@ -44,7 +44,8 @@ class ERPNextPurchaseService(PurchaseServiceBase):
             params=params
         )
         
-        suppliers = [self._map_supplier_from_erpnext(s) for s in (result or [])]
+        data = result.get("data", []) if isinstance(result, dict) else (result or [])
+        suppliers = [self._map_supplier_from_erpnext(s) for s in data if isinstance(s, dict)]
         
         return {
             "suppliers": suppliers,
@@ -145,7 +146,8 @@ class ERPNextPurchaseService(PurchaseServiceBase):
             params=params
         )
         
-        orders = [self._map_purchase_order_from_erpnext(po) for po in (result or [])]
+        data = result.get("data", []) if isinstance(result, dict) else (result or [])
+        orders = [self._map_purchase_order_from_erpnext(po) for po in data if isinstance(po, dict)]
         
         return {"orders": orders, "total": len(orders)}
     
@@ -200,28 +202,65 @@ class ERPNextPurchaseService(PurchaseServiceBase):
         tenant_id: str,
         order_id: str
     ) -> Dict[str, Any]:
-        result = erpnext_adapter.proxy_request(
+        # First, get the current order to validate and pass to submit
+        current = erpnext_adapter.proxy_request(
             tenant_id=tenant_id,
             path=f"resource/Purchase Order/{order_id}",
-            method="PUT",
-            json_data={"docstatus": 1}
+            method="GET"
         )
         
-        return {"message": "Purchase order submitted successfully"}
+        order_data = current.get("data", current)
+        if order_data.get("docstatus", 0) != 0:
+            raise ValueError(f"Purchase Order {order_id} is not in Draft status and cannot be submitted")
+        
+        # Use frappe.client.submit for proper ERPNext workflow
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="method/frappe.client.submit",
+            method="POST",
+            json_data={
+                "doc": order_data
+            }
+        )
+        
+        return {
+            "message": "Purchase order submitted successfully",
+            "order_id": order_id,
+            "status": "Submitted"
+        }
     
     async def cancel_purchase_order(
         self,
         tenant_id: str,
         order_id: str
     ) -> Dict[str, Any]:
-        result = erpnext_adapter.proxy_request(
+        # First, validate the order is in submitted status
+        current = erpnext_adapter.proxy_request(
             tenant_id=tenant_id,
             path=f"resource/Purchase Order/{order_id}",
-            method="PUT",
-            json_data={"docstatus": 2}
+            method="GET"
         )
         
-        return {"message": "Purchase order cancelled successfully"}
+        order_data = current.get("data", current)
+        if order_data.get("docstatus", 0) != 1:
+            raise ValueError(f"Purchase Order {order_id} is not in Submitted status and cannot be cancelled")
+        
+        # Use frappe.client.cancel for proper ERPNext workflow
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="method/frappe.client.cancel",
+            method="POST",
+            json_data={
+                "doctype": "Purchase Order",
+                "name": order_id
+            }
+        )
+        
+        return {
+            "message": "Purchase order cancelled successfully",
+            "order_id": order_id,
+            "status": "Cancelled"
+        }
     
     # ==================== Purchase Receipt Operations ====================
     
@@ -268,7 +307,8 @@ class ERPNextPurchaseService(PurchaseServiceBase):
             params=params
         )
         
-        receipts = [self._map_purchase_receipt_from_erpnext(pr) for pr in (result or [])]
+        data = result.get("data", []) if isinstance(result, dict) else (result or [])
+        receipts = [self._map_purchase_receipt_from_erpnext(pr) for pr in data if isinstance(pr, dict)]
         
         return {"receipts": receipts, "total": len(receipts)}
     
@@ -284,6 +324,135 @@ class ERPNextPurchaseService(PurchaseServiceBase):
         )
         
         return self._map_purchase_receipt_from_erpnext(result.get("data", result))
+    
+    async def update_purchase_receipt(
+        self,
+        tenant_id: str,
+        receipt_id: str,
+        data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update a purchase receipt (only allowed in Draft status).
+        """
+        # First validate the receipt is in draft status
+        current = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/Purchase Receipt/{receipt_id}",
+            method="GET"
+        )
+        
+        current_data = current.get("data", current)
+        if current_data.get("docstatus", 0) != 0:
+            raise ValueError(f"Purchase Receipt {receipt_id} is not in Draft status and cannot be updated")
+        
+        # Map and update
+        erpnext_data = self._map_purchase_receipt_to_erpnext(data)
+        
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/Purchase Receipt/{receipt_id}",
+            method="PUT",
+            json_data=erpnext_data
+        )
+        
+        return self._map_purchase_receipt_from_erpnext(result.get("data", result))
+    
+    async def submit_purchase_receipt(
+        self,
+        tenant_id: str,
+        receipt_id: str
+    ) -> Dict[str, Any]:
+        """
+        Submit a purchase receipt to update inventory.
+        
+        In ERPNext, submitting a Purchase Receipt:
+        1. Sets docstatus to 1 (Submitted)
+        2. Creates Stock Ledger Entries
+        3. Updates inventory (Bin) quantities in the specified warehouses
+        
+        The receipt must be in Draft status (docstatus=0) to be submitted.
+        """
+        # First, get the current receipt to validate it's in draft status
+        current = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/Purchase Receipt/{receipt_id}",
+            method="GET"
+        )
+        
+        receipt_data = current.get("data", current)
+        if receipt_data.get("docstatus", 0) != 0:
+            raise ValueError(f"Purchase Receipt {receipt_id} is not in Draft status and cannot be submitted")
+        
+        # Use frappe.client.submit for proper ERPNext workflow
+        # This ensures:
+        # 1. Validation hooks are triggered
+        # 2. Stock Ledger Entries are created
+        # 3. Bin quantities are updated
+        # 4. Accounting entries (GL) are posted
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="method/frappe.client.submit",
+            method="POST",
+            json_data={
+                "doc": receipt_data
+            }
+        )
+        
+        return {
+            "message": "Purchase receipt submitted successfully",
+            "receipt_id": receipt_id,
+            "status": "Submitted",
+            "inventory_updated": True
+        }
+    
+    async def cancel_purchase_receipt(
+        self,
+        tenant_id: str,
+        receipt_id: str
+    ) -> Dict[str, Any]:
+        """
+        Cancel a submitted purchase receipt.
+        
+        In ERPNext, cancelling a Purchase Receipt:
+        1. Sets docstatus to 2 (Cancelled)
+        2. Creates reverse Stock Ledger Entries
+        3. Reverses the inventory changes
+        
+        The receipt must be in Submitted status (docstatus=1) to be cancelled.
+        """
+        # First, get the current receipt to validate it's in submitted status
+        current = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path=f"resource/Purchase Receipt/{receipt_id}",
+            method="GET"
+        )
+        
+        receipt_data = current.get("data", current)
+        if receipt_data.get("docstatus", 0) != 1:
+            raise ValueError(f"Purchase Receipt {receipt_id} is not in Submitted status and cannot be cancelled")
+        
+        # Use frappe.client.cancel for proper ERPNext workflow
+        # This ensures:
+        # 1. Cancellation hooks are triggered
+        # 2. Reverse Stock Ledger Entries are created
+        # 3. Bin quantities are restored
+        # 4. Reverse accounting entries are posted
+        result = erpnext_adapter.proxy_request(
+            tenant_id=tenant_id,
+            path="method/frappe.client.cancel",
+            method="POST",
+            json_data={
+                "doctype": "Purchase Receipt",
+                "name": receipt_id
+            }
+        )
+        
+        return {
+            "message": "Purchase receipt cancelled successfully",
+            "receipt_id": receipt_id,
+            "status": "Cancelled",
+            "inventory_reversed": True
+        }
     
     # ==================== Purchase Invoice Operations ====================
     
@@ -330,7 +499,8 @@ class ERPNextPurchaseService(PurchaseServiceBase):
             params=params
         )
         
-        invoices = [self._map_purchase_invoice_from_erpnext(pi) for pi in (result or [])]
+        data = result.get("data", []) if isinstance(result, dict) else (result or [])
+        invoices = [self._map_purchase_invoice_from_erpnext(pi) for pi in data if isinstance(pi, dict)]
         
         return {"invoices": invoices, "total": len(invoices)}
     

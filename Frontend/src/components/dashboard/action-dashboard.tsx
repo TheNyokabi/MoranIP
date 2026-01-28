@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useTenantStore, getTenantSlug } from '@/store/tenant-store';
 import { ApiError, authApi, Tenant, TenantMembership } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -300,7 +301,7 @@ function EmptyState({
                     No matches found
                 </h3>
                 <p className="text-muted-foreground text-center max-w-sm mb-6">
-                    Try adjusting your search or filters to find what you're looking for.
+                    Try adjusting your search or filters to find what you&apos;re looking for.
                 </p>
             </div>
         );
@@ -318,7 +319,7 @@ function EmptyState({
                     You have pending invitations
                 </h3>
                 <p className="text-muted-foreground text-center max-w-sm mb-6">
-                    You've been invited to join workspaces. Accept the invitations to get started.
+                    You&apos;ve been invited to join workspaces. Accept the invitations to get started.
                 </p>
                 <div className="flex gap-3">
                     <Button
@@ -354,7 +355,7 @@ function EmptyState({
             </div>
 
             <h3 className="text-xl font-semibold text-foreground mb-2">
-                You're not part of any workspace yet
+                You&apos;re not part of any workspace yet
             </h3>
 
             <p className="text-muted-foreground text-center max-w-sm mb-6">
@@ -406,11 +407,11 @@ export function ActionDashboard() {
     // Fetch engine health status
     const fetchEngineHealth = async (tenantIds: string[]) => {
         if (!token || tenantIds.length === 0) return;
-        
+
         try {
             const healthData = await authApi.checkEngineHealth(tenantIds, token);
             const statusMap: Record<string, 'online' | 'offline' | 'degraded' | 'not_provisioned'> = {};
-            
+
             for (const [tenantId, result] of Object.entries(healthData.results)) {
                 if (result.status === 'online') {
                     statusMap[tenantId] = 'online';
@@ -422,7 +423,7 @@ export function ActionDashboard() {
                     statusMap[tenantId] = 'offline';
                 }
             }
-            
+
             setEngineStatuses(statusMap);
         } catch (e) {
             console.error("Failed to fetch engine health:", e);
@@ -453,7 +454,7 @@ export function ActionDashboard() {
 
             setFavorites(getStoredFavorites());
             setRecentIds(getRecentWorkspaces());
-            
+
             // Fetch engine health for all tenants
             const tenantIds = mems.map(m => m.id);
             await fetchEngineHealth(tenantIds);
@@ -764,6 +765,11 @@ export function ActionDashboard() {
                     />
                 ) : (
                     <div className="space-y-10">
+                        <CardDescription className="text-cyan-100/70">Here&apos;s what&apos;s happening in your workspace today.</CardDescription>
+                        <p className="text-sm font-medium text-white/90">You don&apos;t have any active workspaces.</p>
+                        <p className="text-xs text-white/60 mt-1">Contact your administrator to get access or create a new one.</p>
+                        <p className="text-sm font-medium text-white/90">It looks like the backend is unreachable.</p>
+                        <p className="text-xs text-white/60 mt-1">Please check if the server is running and try again.</p>
                         {favoriteTenants.length > 0 && (
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3">

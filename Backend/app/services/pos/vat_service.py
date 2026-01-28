@@ -60,13 +60,17 @@ class VATService:
                 ]
             }
 
-        total_amount = 0.0
-        total_vat = 0.0
+        total_amount = Decimal('0.00')
+        total_vat = Decimal('0.00')
         processed_items = []
 
         for item in items:
-            amount = item.get('amount', 0)
-            item_vat_rate = (item.get('vat_rate') or self.default_vat_rate) / 100  # Convert percentage to decimal
+            amount = Decimal(str(item.get('amount', 0)))
+            vat_rate_val = item.get('vat_rate')
+            if vat_rate_val is None:
+                vat_rate_val = self.default_vat_rate
+            
+            item_vat_rate = Decimal(str(vat_rate_val)) / Decimal('100')
 
             # Calculate VAT for this item
             vat_amount = amount * item_vat_rate
@@ -76,9 +80,9 @@ class VATService:
 
             processed_items.append({
                 **item,
-                'vat_amount': round(vat_amount, 2),
-                'net_amount': round(net_amount, 2),
-                'vat_rate': item_vat_rate * 100  # Store as percentage
+                'vat_amount': float(round(vat_amount, 2)),
+                'net_amount': float(round(net_amount, 2)),
+                'vat_rate': float(item_vat_rate * 100)  # Store as percentage
             })
 
         total_base = sum(item.get('net_amount', 0) for item in processed_items)

@@ -69,7 +69,8 @@ export default function MembersSettingsPage({ params }: { params: { tenantSlug: 
     const [memberToRemove, setMemberToRemove] = useState<TenantMembership | null>(null)
 
     // Check if user has admin permissions based on current membership role
-    const currentMembership = currentTenant?.memberships?.find(m => m.user_id === user?.id);
+    // @ts-ignore - memberships property exists at runtime or extended type
+    const currentMembership = (currentTenant as any)?.memberships?.find((m: any) => m.user_id === user?.id);
     const hasAdminAccess = user?.isSuperAdmin ||
         currentMembership?.role === 'OWNER' ||
         currentMembership?.role === 'ADMIN';

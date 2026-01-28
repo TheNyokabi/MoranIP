@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,9 @@ import {
     Car,
     Wrench,
     Plus,
-    ChevronRight,
     Search,
-    Calendar,
     DollarSign,
     TrendingUp,
-    AlertTriangle,
     MoreVertical,
     Eye,
     Edit,
@@ -28,24 +25,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import { assetsApi, type Asset } from "@/lib/api/assets";
 
-const mockStats = {
-    totalAssets: 156,
-    totalValue: 24500000,
-    maintenanceDue: 8,
-    depreciated: 12,
-};
-
-const mockAssets = [
-    { id: "AST-001", name: "Toyota Hilux - KCH 543X", category: "Vehicles", status: "active", location: "Nairobi HQ", value: 3500000, purchaseDate: "2024-03-15" },
-    { id: "AST-002", name: "MacBook Pro 16\"", category: "IT Equipment", status: "active", location: "Finance Dept", value: 350000, purchaseDate: "2024-06-20" },
-    { id: "AST-003", name: "Industrial Generator 50KVA", category: "Machinery", status: "maintenance", location: "Factory", value: 1200000, purchaseDate: "2023-01-10" },
-    { id: "AST-004", name: "Office Building - Mombasa", category: "Property", status: "active", location: "Mombasa", value: 15000000, purchaseDate: "2020-05-01" },
-    { id: "AST-005", name: "Dell Server Rack", category: "IT Equipment", status: "depreciated", location: "Server Room", value: 800000, purchaseDate: "2019-08-22" },
-];
-
-const categoryIcons = {
+const categoryIcons: Record<string, any> = {
     Vehicles: Car,
     "IT Equipment": Laptop,
     Machinery: Wrench,
@@ -57,6 +40,8 @@ const statusConfig = {
     maintenance: { label: "Maintenance", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
     depreciated: { label: "Depreciated", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400" },
     disposed: { label: "Disposed", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+    draft: { label: "Draft", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400" },
+    submitted: { label: "Submitted", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
 };
 
 export default function AssetsDashboardPage() {
@@ -64,23 +49,47 @@ export default function AssetsDashboardPage() {
     const router = useRouter();
     const tenantSlug = params.tenantSlug as string;
     const [searchQuery, setSearchQuery] = useState("");
+    const [assets, setAssets] = useState<Asset[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchAssets() {
+            try {
+                const response = await assetsApi.listAssets();
+                setAssets(response.data || []);
+            } catch (error) {
+                console.error("Failed to fetch assets:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        fetchAssets();
+    }, []);
 
     const navigateTo = (path: string) => {
         router.push(`/w/${tenantSlug}/assets${path}`);
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-KE", {
-            style: "currency",
-            currency: "KES",
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
+    // Calculate dynamic stats
+    const totalAssets = assets.length;
+    const totalValue = assets.reduce((acc, asset) => acc + (asset.current_value || asset.purchase_amount || 0), 0);
+    const maintenanceDue = assets.filter(a => a.status === 'In Maintenance' || a.status === 'Maintenance').length; // Adjust based on actual ERP statuses
+    const depreciated = assets.filter(a => a.status === 'Fully Depreciated' || a.status === 'Partially Depreciated').length;
 
-    const filteredAssets = mockAssets.filter(asset =>
-        asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        asset.category.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredAssets = assets.filter(asset =>
+        asset.asset_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        asset.asset_category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        asset.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const getStatusConfig = (status: string) => {
+        const normalized = status?.toLowerCase() || 'draft';
+        if (normalized.includes('active') || normalized === 'submitted') return statusConfig.active;
+        if (normalized.includes('maintenance')) return statusConfig.maintenance;
+        if (normalized.includes('depreciated')) return statusConfig.depreciated;
+        if (normalized.includes('sold') || normalized.includes('scrapped')) return statusConfig.disposed;
+        return statusConfig.draft;
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -110,7 +119,7 @@ export default function AssetsDashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Assets</p>
-                                    <p className="text-2xl font-bold">{mockStats.totalAssets}</p>
+                                    <p className="text-2xl font-bold">{totalAssets}</p>
                                 </div>
                                 <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                                     <Building2 className="h-5 w-5 text-blue-600" />
@@ -123,7 +132,7 @@ export default function AssetsDashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Value</p>
-                                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(mockStats.totalValue)}</p>
+                                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(totalValue)}</p>
                                 </div>
                                 <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                                     <DollarSign className="h-5 w-5 text-emerald-600" />
@@ -136,7 +145,7 @@ export default function AssetsDashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Maintenance Due</p>
-                                    <p className="text-2xl font-bold text-amber-600">{mockStats.maintenanceDue}</p>
+                                    <p className="text-2xl font-bold text-amber-600">{maintenanceDue}</p>
                                 </div>
                                 <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                                     <Wrench className="h-5 w-5 text-amber-600" />
@@ -149,7 +158,7 @@ export default function AssetsDashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Depreciated</p>
-                                    <p className="text-2xl font-bold">{mockStats.depreciated}</p>
+                                    <p className="text-2xl font-bold">{depreciated}</p>
                                 </div>
                                 <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                     <TrendingUp className="h-5 w-5 text-slate-500" />
@@ -196,60 +205,74 @@ export default function AssetsDashboardPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {filteredAssets.map((asset) => {
-                                        const status = statusConfig[asset.status as keyof typeof statusConfig];
-                                        const CategoryIcon = categoryIcons[asset.category as keyof typeof categoryIcons] || Building2;
-                                        return (
-                                            <tr
-                                                key={asset.id}
-                                                className="hover:bg-muted/50 transition-colors cursor-pointer"
-                                                onClick={() => navigateTo(`/${asset.id}`)}
-                                            >
-                                                <td className="py-3 px-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
-                                                            <CategoryIcon className="h-5 w-5 text-white" />
+                                    {isLoading ? (
+                                        <tr>
+                                            <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                Loading assets...
+                                            </td>
+                                        </tr>
+                                    ) : filteredAssets.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                No assets found
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredAssets.map((asset) => {
+                                            const status = getStatusConfig(asset.status);
+                                            const CategoryIcon = categoryIcons[asset.asset_category] || Building2;
+                                            return (
+                                                <tr
+                                                    key={asset.name}
+                                                    className="hover:bg-muted/50 transition-colors cursor-pointer"
+                                                    onClick={() => navigateTo(`/${asset.name}`)}
+                                                >
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                                                                <CategoryIcon className="h-5 w-5 text-white" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium">{asset.asset_name}</p>
+                                                                <p className="text-sm text-muted-foreground font-mono">{asset.name}</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="font-medium">{asset.name}</p>
-                                                            <p className="text-sm text-muted-foreground font-mono">{asset.id}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-4">{asset.category}</td>
-                                                <td className="py-3 px-4 text-muted-foreground">{asset.location}</td>
-                                                <td className="py-3 px-4 text-right font-medium">{formatCurrency(asset.value)}</td>
-                                                <td className="py-3 px-4 text-center">
-                                                    <Badge className={cn("text-xs", status.color)}>
-                                                        {status.label}
-                                                    </Badge>
-                                                </td>
-                                                <td className="py-3 px-4 text-right">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                            <Button variant="ghost" size="icon">
-                                                                <MoreVertical className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/${asset.id}`); }}>
-                                                                <Eye className="h-4 w-4 mr-2" />
-                                                                View Details
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/${asset.id}/edit`); }}>
-                                                                <Edit className="h-4 w-4 mr-2" />
-                                                                Edit Asset
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/${asset.id}/maintenance`); }}>
-                                                                <Wrench className="h-4 w-4 mr-2" />
-                                                                Log Maintenance
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    </td>
+                                                    <td className="py-3 px-4">{asset.asset_category}</td>
+                                                    <td className="py-3 px-4 text-muted-foreground">{asset.location || "N/A"}</td>
+                                                    <td className="py-3 px-4 text-right font-medium">{formatCurrency(asset.current_value || asset.purchase_amount || 0)}</td>
+                                                    <td className="py-3 px-4 text-center">
+                                                        <Badge className={cn("text-xs", status.color)}>
+                                                            {status.label}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                                <Button variant="ghost" size="icon">
+                                                                    <MoreVertical className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/${asset.name}`); }}>
+                                                                    <Eye className="h-4 w-4 mr-2" />
+                                                                    View Details
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/${asset.name}/edit`); }}>
+                                                                    <Edit className="h-4 w-4 mr-2" />
+                                                                    Edit Asset
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/${asset.name}/maintenance`); }}>
+                                                                    <Wrench className="h-4 w-4 mr-2" />
+                                                                    Log Maintenance
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </div>

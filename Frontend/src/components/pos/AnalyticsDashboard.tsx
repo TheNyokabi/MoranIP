@@ -76,7 +76,7 @@ export function AnalyticsDashboard() {
       }
 
       const response = await apiFetch(`/pos/analytics/dashboard?${params}`, {}, token)
-      setAnalyticsData(response.analytics)
+      setAnalyticsData((response as any).analytics)
 
     } catch (error) {
       console.error('Failed to load analytics:', error)
@@ -353,7 +353,7 @@ export function AnalyticsDashboard() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                      label={({ name, percentage }: any) => `${name}: ${percentage.toFixed(1)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -362,7 +362,7 @@ export function AnalyticsDashboard() {
                         <Cell key={`cell-${index}`} fill={paymentColors[index % paymentColors.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                    <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>

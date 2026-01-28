@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,9 @@ import {
     XCircle,
     AlertTriangle,
     Plus,
-    ChevronRight,
     Search,
     Calendar,
     User,
-    Package,
     MoreVertical,
     Eye,
     FileText,
@@ -29,27 +27,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-
-const mockStats = {
-    totalInspections: 245,
-    passed: 220,
-    failed: 15,
-    pending: 10,
-    passRate: 90,
-};
-
-const mockInspections = [
-    { id: "QC-001", product: "Office Chair Premium", batch: "BCH-2024-001", inspector: "John K.", status: "passed", date: "Today", score: 98 },
-    { id: "QC-002", product: "Executive Desk", batch: "BCH-2024-002", inspector: "Mary W.", status: "passed", date: "Today", score: 95 },
-    { id: "QC-003", product: "Filing Cabinet", batch: "BCH-2024-003", inspector: "Peter O.", status: "failed", date: "Yesterday", score: 72 },
-    { id: "QC-004", product: "Conference Table", batch: "BCH-2024-004", inspector: "Jane A.", status: "pending", date: "Yesterday", score: null },
-    { id: "QC-005", product: "Printer Paper A4", batch: "BCH-2024-005", inspector: "David K.", status: "passed", date: "2 days ago", score: 100 },
-];
+import { qualityApi, type QualityInspection } from "@/lib/api/quality";
 
 const statusConfig = {
     passed: { label: "Passed", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", icon: CheckCircle2 },
     failed: { label: "Failed", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: XCircle },
     pending: { label: "Pending", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400", icon: AlertTriangle },
+    submitted: { label: "Submitted", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: ClipboardCheck },
+    cancelled: { label: "Cancelled", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400", icon: XCircle },
 };
 
 export default function QualityDashboardPage() {
@@ -58,17 +43,59 @@ export default function QualityDashboardPage() {
     const tenantSlug = params.tenantSlug as string;
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [inspections, setInspections] = useState<QualityInspection[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchInspections() {
+            try {
+                const response = await qualityApi.listInspections();
+                setInspections(response.data || []);
+            } catch (error) {
+                console.error("Failed to fetch inspections:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        fetchInspections();
+    }, []);
 
     const navigateTo = (path: string) => {
         router.push(`/w/${tenantSlug}/quality${path}`);
     };
 
-    const filteredInspections = mockInspections.filter(inspection => {
-        const matchesSearch = inspection.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            inspection.batch.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === "all" || inspection.status === statusFilter;
+    // Calculate stats
+    const totalInspections = inspections.length;
+    const passed = inspections.filter(i => i.status === 'Passed' || i.status === 'passed').length;
+    const failed = inspections.filter(i => i.status === 'Failed' || i.status === 'failed' || i.status === 'Rejected').length;
+    const pending = inspections.filter(i => !['Passed', 'passed', 'Failed', 'failed', 'Rejected', 'Cancelled'].includes(i.status)).length;
+
+    const passRate = totalInspections > 0
+        ? Math.round((passed / (passed + failed + (pending > 0 ? 0 : 1)) * 100)) || 0 // Avoid NaN if 0 total
+        : 0;
+
+    const filteredInspections = inspections.filter(inspection => {
+        const searchText = searchQuery.toLowerCase();
+        const matchesSearch =
+            inspection.name.toLowerCase().includes(searchText) ||
+            (inspection.item_code || "").toLowerCase().includes(searchText) ||
+            (inspection.item_name || "").toLowerCase().includes(searchText) ||
+            (inspection.inspection_type || "").toLowerCase().includes(searchText);
+
+        const statusLower = inspection.status.toLowerCase();
+        const matchesStatus = statusFilter === "all" || statusLower === statusFilter;
+
         return matchesSearch && matchesStatus;
     });
+
+    const getStatusConfig = (status: string) => {
+        const normalized = status.toLowerCase();
+        if (normalized === 'passed') return statusConfig.passed;
+        if (normalized === 'failed' || normalized === 'rejected') return statusConfig.failed;
+        if (normalized === 'submitted') return statusConfig.submitted;
+        if (normalized === 'cancelled') return statusConfig.cancelled;
+        return statusConfig.pending;
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -97,7 +124,7 @@ export default function QualityDashboardPage() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col items-center">
                                 <ClipboardCheck className="h-6 w-6 text-blue-600 mb-2" />
-                                <p className="text-2xl font-bold">{mockStats.totalInspections}</p>
+                                <p className="text-2xl font-bold">{totalInspections}</p>
                                 <p className="text-xs text-muted-foreground">Total Inspections</p>
                             </div>
                         </CardContent>
@@ -106,7 +133,7 @@ export default function QualityDashboardPage() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col items-center">
                                 <CheckCircle2 className="h-6 w-6 text-emerald-600 mb-2" />
-                                <p className="text-2xl font-bold text-emerald-600">{mockStats.passed}</p>
+                                <p className="text-2xl font-bold text-emerald-600">{passed}</p>
                                 <p className="text-xs text-muted-foreground">Passed</p>
                             </div>
                         </CardContent>
@@ -115,8 +142,8 @@ export default function QualityDashboardPage() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col items-center">
                                 <XCircle className="h-6 w-6 text-red-600 mb-2" />
-                                <p className="text-2xl font-bold text-red-600">{mockStats.failed}</p>
-                                <p className="text-xs text-muted-foreground">Failed</p>
+                                <p className="text-2xl font-bold text-red-600">{failed}</p>
+                                <p className="text-xs text-muted-foreground">Failed/Rejected</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -124,7 +151,7 @@ export default function QualityDashboardPage() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col items-center">
                                 <AlertTriangle className="h-6 w-6 text-amber-600 mb-2" />
-                                <p className="text-2xl font-bold text-amber-600">{mockStats.pending}</p>
+                                <p className="text-2xl font-bold text-amber-600">{pending}</p>
                                 <p className="text-xs text-muted-foreground">Pending</p>
                             </div>
                         </CardContent>
@@ -133,8 +160,8 @@ export default function QualityDashboardPage() {
                         <CardContent className="pt-6">
                             <div className="flex flex-col items-center">
                                 <p className="text-sm text-muted-foreground mb-2">Pass Rate</p>
-                                <p className="text-3xl font-bold text-purple-600">{mockStats.passRate}%</p>
-                                <Progress value={mockStats.passRate} className="w-full mt-2 h-2" />
+                                <p className="text-3xl font-bold text-purple-600">{passRate}%</p>
+                                <Progress value={passRate} className="w-full mt-2 h-2" />
                             </div>
                         </CardContent>
                     </Card>
@@ -173,75 +200,69 @@ export default function QualityDashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {filteredInspections.map((inspection) => {
-                                const status = statusConfig[inspection.status as keyof typeof statusConfig];
-                                const StatusIcon = status.icon;
-                                return (
-                                    <div
-                                        key={inspection.id}
-                                        className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 hover:shadow-md cursor-pointer transition-all duration-200"
-                                        onClick={() => navigateTo(`/inspections/${inspection.id}`)}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", status.color)}>
-                                                <StatusIcon className="h-6 w-6" />
+                            {isLoading ? (
+                                <div className="text-center py-8 text-muted-foreground">Loading inspections...</div>
+                            ) : filteredInspections.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">No inspections found</div>
+                            ) : (
+                                filteredInspections.map((inspection) => {
+                                    const status = getStatusConfig(inspection.status);
+                                    const StatusIcon = status.icon;
+                                    return (
+                                        <div
+                                            key={inspection.name}
+                                            className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 hover:shadow-md cursor-pointer transition-all duration-200"
+                                            onClick={() => navigateTo(`/inspections/${inspection.name}`)}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", status.color)}>
+                                                    <StatusIcon className="h-6 w-6" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono text-sm text-muted-foreground">{inspection.name}</span>
+                                                        <span className="text-sm text-muted-foreground">•</span>
+                                                        <span className="font-mono text-sm text-muted-foreground">{inspection.inspection_type}</span>
+                                                    </div>
+                                                    <p className="font-medium">{inspection.item_name || inspection.item_code || "Unknown Item"}</p>
+                                                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                                        {inspection.submitted_by && (
+                                                            <span className="flex items-center gap-1">
+                                                                <User className="h-3 w-3" />
+                                                                {inspection.submitted_by}
+                                                            </span>
+                                                        )}
+                                                        {inspection.inspection_date && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Calendar className="h-3 w-3" />
+                                                                {inspection.inspection_date}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-sm text-muted-foreground">{inspection.id}</span>
-                                                    <span className="text-sm text-muted-foreground">•</span>
-                                                    <span className="font-mono text-sm text-muted-foreground">{inspection.batch}</span>
-                                                </div>
-                                                <p className="font-medium">{inspection.product}</p>
-                                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                                    <span className="flex items-center gap-1">
-                                                        <User className="h-3 w-3" />
-                                                        {inspection.inspector}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {inspection.date}
-                                                    </span>
-                                                </div>
+                                            <div className="flex items-center gap-4">
+                                                <Badge variant="outline" className={status.color}>
+                                                    {status.label}
+                                                </Badge>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                        <Button variant="ghost" size="icon">
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/inspections/${inspection.name}`); }}>
+                                                            <Eye className="h-4 w-4 mr-2" />
+                                                            View Details
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            {inspection.score !== null && (
-                                                <div className="text-right">
-                                                    <p className={cn(
-                                                        "text-2xl font-bold",
-                                                        inspection.score >= 90 ? "text-emerald-600" :
-                                                            inspection.score >= 75 ? "text-amber-600" : "text-red-600"
-                                                    )}>
-                                                        {inspection.score}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">Score</p>
-                                                </div>
-                                            )}
-                                            <Badge variant="outline" className={status.color}>
-                                                {status.label}
-                                            </Badge>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                    <Button variant="ghost" size="icon">
-                                                        <MoreVertical className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/inspections/${inspection.id}`); }}>
-                                                        <Eye className="h-4 w-4 mr-2" />
-                                                        View Details
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigateTo(`/inspections/${inspection.id}/report`); }}>
-                                                        <FileText className="h-4 w-4 mr-2" />
-                                                        Generate Report
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })
+                            )}
                         </div>
                     </CardContent>
                 </Card>

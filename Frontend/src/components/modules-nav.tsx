@@ -39,6 +39,12 @@ export function ModulesNav({ tenantSlug, className }: ModulesNavProps) {
       description: 'Customer relations',
     },
     {
+      name: 'Purchasing',
+      href: `/w/${tenantSlug}/purchasing`,
+      icon: ShoppingCart, // Using ShoppingCart as it relates to buying, though CreditCard was used in Dashboard. Consistency vs semantics. Let's use ShoppingCart here or maybe something better if available in imports. Existing imports include ShoppingCart.
+      description: 'Purchase orders & suppliers',
+    },
+    {
       name: 'HR',
       href: `/w/${tenantSlug}/modules/hr`,
       icon: HelpCircle,

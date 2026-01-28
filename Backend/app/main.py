@@ -10,12 +10,15 @@ from .models.iam import Tenant, TenantSettings  # noqa: F401
 from .models.rbac import Role, Permission, UserRole  # noqa: F401
 from .models.pos_warehouse_access import WarehouseAccessRole, WarehouseAccessUser  # noqa: F401
 from .models.onboarding import TenantOnboarding, Contact  # noqa: F401
+from .models.pricing import PricingTier, ItemPrice, BatchPricing, PricingSettings, PriceChangeLog  # noqa: F401
+from .models.cash_management import CashSession, CashTransaction, CashDiscrepancy, CashSettings, CashDenomination  # noqa: F401
+from .models.tax import TaxType, TaxRate, ItemTaxTemplate, TaxTransaction, WithholdingTaxConfig, TaxSettings as TaxSettingsModel, TaxFilingPeriod  # noqa: F401
 
 from .routers import odoo, erp, auth, iam, erpnext, pos, erp_modules, inventory, purchases, onboarding, settings as settings_router, provisioning, pos_quick_actions, pos_receipts, i18n
 from .api.v2 import pos as pos_v2
 from .routers import pos_profiles, pos_sessions, pos_orders, pos_quick_actions, pos_payments, pos_receipts, pos_loyalty, pos_layaway, pos_sync, pos_analytics, pos_warehouse_access  # PoS routers
 from .routers import roles, permissions, user_roles, audit, imports, rbac  # RBAC routers
-from .routers import accounting, crm, hr, manufacturing, projects, paint  # Module routers
+from .routers import accounting, crm, hr, manufacturing, projects, paint, gamification, messaging, plugins, portals, ecommerce, enterprise, pricing, cash_management, tax  # Module routers
 from .routers import tenant_setup  # Tenant setup router
 from .routers import reports, commissions, dashboard, files, notifications  # Phase 5 routers
 from .dependencies.auth import oauth2_scheme
@@ -54,7 +57,7 @@ app.include_router(erp_modules.router)
 app.include_router(odoo.router)
 app.include_router(erpnext.router)
 app.include_router(erp.router)
-app.include_router(pos.router, prefix="/api/pos")
+app.include_router(pos.router, prefix="/api/tenants/{tenant_id}/erp/pos")
 app.include_router(inventory.router, prefix="/api/tenants/{tenant_id}/erp")
 app.include_router(purchases.router, prefix="/api/tenants/{tenant_id}/erp")
 app.include_router(accounting.router, prefix="/api/tenants/{tenant_id}/erp")
@@ -65,6 +68,7 @@ app.include_router(manufacturing.router, prefix="/api/tenants/{tenant_id}/erp")
 app.include_router(projects.router, prefix="/api/tenants/{tenant_id}/erp")
 
 # Compatibility prefixes for calls lacking tenant_id in URL (resolves via token/header)
+app.include_router(pos.router, prefix="/api/pos", tags=["Compatibility"])
 app.include_router(inventory.router, prefix="/api", tags=["Compatibility"])
 app.include_router(purchases.router, prefix="/api", tags=["Compatibility"])
 app.include_router(accounting.router, prefix="/api", tags=["Compatibility"])
@@ -75,23 +79,60 @@ app.include_router(manufacturing.router, prefix="/api", tags=["Compatibility"])
 app.include_router(projects.router, prefix="/api", tags=["Compatibility"])
 
 from app.routers import sales, support, assets, quality
-app.include_router(sales.router, prefix="/api")
-app.include_router(support.router, prefix="/api")
-app.include_router(assets.router, prefix="/api")
-app.include_router(quality.router, prefix="/api")
-app.include_router(pos_profiles.router, prefix="/api")
-app.include_router(pos_sessions.router, prefix="/api")
-app.include_router(pos_orders.router, prefix="/api")
-app.include_router(pos_payments.router, prefix="/api")
-app.include_router(pos_receipts.router, prefix="/api")
-app.include_router(pos_quick_actions.router, prefix="/api")
-app.include_router(pos_loyalty.router, prefix="/api")
-app.include_router(pos_layaway.router, prefix="/api")
-app.include_router(pos_sync.router, prefix="/api")
-app.include_router(pos_analytics.router, prefix="/api")
-app.include_router(pos_warehouse_access.router, prefix="/api")
-app.include_router(pos_v2.router, prefix="/api")
-app.include_router(settings_router.router, prefix="/api")
+app.include_router(sales.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(support.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(assets.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(quality.router, prefix="/api/tenants/{tenant_id}/erp")
+
+# POS-related routers with tenant prefix
+app.include_router(pos_profiles.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_sessions.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_orders.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_payments.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_receipts.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_quick_actions.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_loyalty.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_layaway.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_sync.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_analytics.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_warehouse_access.router, prefix="/api/tenants/{tenant_id}/erp")
+
+# Compatibility routes for POS (without tenant in URL)
+app.include_router(sales.router, prefix="/api", tags=["Compatibility"])
+app.include_router(support.router, prefix="/api", tags=["Compatibility"])
+app.include_router(assets.router, prefix="/api", tags=["Compatibility"])
+app.include_router(quality.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_profiles.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_sessions.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_orders.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_payments.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_receipts.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_quick_actions.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_loyalty.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_layaway.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_sync.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_analytics.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_warehouse_access.router, prefix="/api", tags=["Compatibility"])
+
+# Tenant-scoped module routers
+app.include_router(gamification.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(messaging.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(plugins.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(portals.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(ecommerce.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(enterprise.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(pos_v2.router, prefix="/api/tenants/{tenant_id}/erp")
+app.include_router(settings_router.router, prefix="/api/tenants/{tenant_id}")
+
+# Compatibility routes
+app.include_router(gamification.router, prefix="/api", tags=["Compatibility"])
+app.include_router(messaging.router, prefix="/api", tags=["Compatibility"])
+app.include_router(plugins.router, prefix="/api", tags=["Compatibility"])
+app.include_router(portals.router, prefix="/api", tags=["Compatibility"])
+app.include_router(ecommerce.router, prefix="/api", tags=["Compatibility"])
+app.include_router(enterprise.router, prefix="/api", tags=["Compatibility"])
+app.include_router(pos_v2.router, prefix="/api", tags=["Compatibility"])
+app.include_router(settings_router.router, prefix="/api", tags=["Compatibility"])
 
 # RBAC routers
 app.include_router(rbac.router)  # New RBAC management router
@@ -114,6 +155,18 @@ app.include_router(commissions.router, prefix="/api", tags=["Compatibility"])
 app.include_router(dashboard.router, prefix="/api", tags=["Compatibility"])
 app.include_router(files.router, prefix="/api", tags=["Compatibility"])
 app.include_router(notifications.router, prefix="/api")
+
+# Pricing Engine
+app.include_router(pricing.router, prefix="/api/tenants/{tenant_id}")
+app.include_router(pricing.router, prefix="/api", tags=["Compatibility"])
+
+# Cash Management
+app.include_router(cash_management.router, prefix="/api/tenants/{tenant_id}")
+app.include_router(cash_management.router, prefix="/api", tags=["Compatibility"])
+
+# Tax Management
+app.include_router(tax.router, prefix="/api/tenants/{tenant_id}")
+app.include_router(tax.router, prefix="/api", tags=["Compatibility"])
 
 @app.on_event("startup")
 async def startup_event():

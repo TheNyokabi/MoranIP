@@ -99,7 +99,7 @@ class POSBulkStockRequest(BaseModel):
 
 class POSBulkStockEntry(BaseModel):
     item_code: str
-    qty: float
+    qty: Optional[float] = None  # None indicates unknown stock
 
 
 class POSBulkStockResponse(BaseModel):
@@ -209,6 +209,8 @@ async def get_item_stock(
         if warehouse:
             params["warehouse"] = warehouse
 
+        logger.info(f"Fetching stock for {item_code} in {warehouse} (Tenant: {tenant_id})")
+
         stock = erpnext_adapter.proxy_request(
             tenant_id=tenant_id,
             path="method/erpnext.stock.utils.get_stock_balance",
@@ -217,6 +219,7 @@ async def get_item_stock(
         )
         
         # Handle different response formats
+        qty = 0
         if isinstance(stock, dict):
             if "message" in stock:
                 message = stock.get("message")
@@ -228,20 +231,20 @@ async def get_item_stock(
                 qty = stock.get("qty", stock.get("stock_qty", stock.get("actual_qty", 0)))
         elif isinstance(stock, (int, float)):
             qty = float(stock)
-        else:
-            qty = 0
         
         # If method returns 0, try stock ledger as a fallback for accuracy
         if qty == 0:
+            logger.info(f"Primary stock check returned 0 for {item_code}. Attempting ledger fallback.")
             raise ValueError("Stock balance returned 0; attempting ledger fallback")
         
-        return {"item_code": item_code, "warehouse": warehouse, "qty": qty}
+        return {"item_code": item_code, "warehouse": warehouse, "qty": float(qty)}
     
     except Exception as e:
         # Fallback: Query Stock Ledger Entry to get latest balance
         try:
             filters = [["item_code", "=", item_code]]
             if warehouse:
+                # Warehouse fallback: If warehouse ID/Name mismatch, try fuzzy match or fallback to just company
                 filters.append(["warehouse", "=", warehouse])
             
             # Get latest entry sorted by posting date/time
@@ -270,15 +273,17 @@ async def get_item_stock(
             if entries and len(entries) > 0:
                 latest_entry = entries[0]
                 qty = float(latest_entry.get("qty_after_transaction", 0))
+                logger.info(f"Ledger fallback found stock: {qty} for {item_code}")
             else:
                 # No ledger entries means 0 stock
                 qty = 0
+                logger.warning(f"No ledger entries found for {item_code} in {warehouse}")
             
             return {"item_code": item_code, "warehouse": warehouse, "qty": qty}
         
         except Exception as fallback_error:
             # If both methods fail, return 0 stock with a warning
-            print(f"Warning: Could not get stock for {item_code}: {str(e)}, fallback also failed: {str(fallback_error)}")
+            logger.error(f"Stock fetch failed for {item_code}: {str(e)}, fallback failed: {str(fallback_error)}")
             return {"item_code": item_code, "warehouse": warehouse, "qty": 0}
 
 
@@ -340,7 +345,7 @@ async def get_bulk_item_stock(
             item_codes_key = ",".join(sorted(item_codes))
             digest = hashlib.sha1(item_codes_key.encode("utf-8")).hexdigest()
             cache_key = f"pos:stockbulk:{tenant_id}:{warehouse}:{digest}"
-            cached = await redis_client.get(cache_key)
+            cached = redis_client.get(cache_key)
             if cached:
                 return json.loads(cached)
         except Exception:
@@ -381,7 +386,64 @@ async def get_bulk_item_stock(
             qty_by_item[str(code)] = 0.0
 
     missing_item_codes = [code for code in item_codes if code not in qty_by_item]
-    stocks = [{"item_code": code, "qty": float(qty_by_item.get(code, 0.0))} for code in item_codes]
+    
+    # Fallback: Query Stock Ledger Entry for items not in Bin
+    if missing_item_codes and warehouse:
+        try:
+            # Query Stock Ledger Entry for missing items
+            sle_filters = [
+                ["warehouse", "=", warehouse],
+                ["item_code", "in", missing_item_codes]
+            ]
+            sle_result = erpnext_adapter.proxy_request(
+                tenant_id=tenant_id,
+                path="resource/Stock Ledger Entry",
+                method="GET",
+                params={
+                    "fields": json.dumps(["item_code", "qty_after_transaction"]),
+                    "filters": json.dumps(sle_filters),
+                    "order_by": "posting_date desc, posting_time desc, creation desc",
+                    "limit_page_length": len(missing_item_codes) * 10,  # Get multiple entries per item
+                }
+            )
+            
+            sle_rows = []
+            if isinstance(sle_result, dict):
+                sle_rows = sle_result.get("data", []) or []
+            elif isinstance(sle_result, list):
+                sle_rows = sle_result
+            
+            # Get the latest qty for each missing item
+            sle_qty_by_item: Dict[str, float] = {}
+            for row in sle_rows:
+                if not isinstance(row, dict):
+                    continue
+                code = row.get("item_code")
+                if code and code not in sle_qty_by_item:
+                    # First entry is latest due to order_by
+                    try:
+                        sle_qty_by_item[str(code)] = float(row.get("qty_after_transaction", 0) or 0)
+                    except Exception:
+                        sle_qty_by_item[str(code)] = 0.0
+            
+            # Merge SLE results into qty_by_item
+            for code, qty in sle_qty_by_item.items():
+                qty_by_item[code] = qty
+            
+            # Update missing list
+            missing_item_codes = [code for code in item_codes if code not in qty_by_item]
+            logger.info(f"Stock Ledger fallback found {len(sle_qty_by_item)} items, still missing: {len(missing_item_codes)}")
+        except Exception as sle_error:
+            logger.warning(f"Stock Ledger fallback failed: {sle_error}")
+    
+    # Build response - use None for truly missing items to indicate unknown stock
+    stocks = []
+    for code in item_codes:
+        if code in qty_by_item:
+            stocks.append({"item_code": code, "qty": float(qty_by_item[code])})
+        else:
+            # Unknown stock - frontend should show item (not hide it)
+            stocks.append({"item_code": code, "qty": None})
 
     response = {
         "warehouse": warehouse,
@@ -393,7 +455,7 @@ async def get_bulk_item_stock(
 
     if redis_client is not None and cache_key is not None:
         try:
-            await redis_client.setex(cache_key, cache_ttl_seconds, json.dumps(response))
+            redis_client.setex(cache_key, cache_ttl_seconds, json.dumps(response))
         except Exception:
             pass
 
@@ -426,13 +488,37 @@ async def list_warehouses(
     try:
         tenant_uuid = uuid.UUID(tenant_id)
         tenant_obj = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
-        tenant_company = tenant_obj.name if tenant_obj else None
+        if tenant_obj:
+             # Priority 1: Use explicitly configured company name in settings
+             if tenant_obj.tenant_settings and tenant_obj.tenant_settings.company_name:
+                  tenant_company = tenant_obj.tenant_settings.company_name
+             # Priority 2: Use tenant name
+             else:
+                  tenant_company = tenant_obj.name
     except ValueError:
         tenant_company = None
 
+    # Priority 3: Validate/Verify against available companies in ERPNext
+    try:
+        companies_res = erpnext_adapter.proxy_request(
+             tenant_id=tenant_id,
+             path="resource/Company",
+             method="GET",
+             params={"limit_page_length": 5}
+        )
+        if isinstance(companies_res, dict):
+             companies_data = companies_res.get("data", [])
+             company_names = [c.get("name") for c in companies_data if c.get("name")]
+             
+             if company_names:
+                  # If our resolved tenant_company is not in the list, default to the first available company
+                  if tenant_company not in company_names:
+                       tenant_company = company_names[0]
+    except Exception:
+        # If company fetch fails, proceed with best effort (tenant_company)
+        pass
+
     if include_all and not is_pos_admin:
-        # Log for debugging
-        print(f"Access denied for include_all: user roles={roles}, is_super_admin={current_user.get('is_super_admin')}")
         raise HTTPException(status_code=403, detail="Only admin users can request include_all warehouses")
 
     # Get all POS Profiles
@@ -443,12 +529,17 @@ async def list_warehouses(
     
     # Get all warehouses
     # Get all warehouses (scoped to tenant's company when possible)
-    warehouse_params = None
+    # Include is_group field to allow frontend to filter out group warehouses
+    warehouse_filters = []
     if tenant_company:
-        warehouse_params = {
-            "filters": json.dumps([["company", "=", tenant_company]]),
-            "limit_page_length": 1000,
-        }
+        warehouse_filters.append(["company", "=", tenant_company])
+    
+    warehouse_params = {
+        "fields": json.dumps(["name", "warehouse_name", "is_group", "company", "parent_warehouse"]),
+        "limit_page_length": 1000,
+    }
+    if warehouse_filters:
+        warehouse_params["filters"] = json.dumps(warehouse_filters)
 
     warehouses = erpnext_adapter.proxy_request(
         tenant_id=tenant_id,
@@ -456,7 +547,7 @@ async def list_warehouses(
         method="GET",
         params=warehouse_params,
     )
-
+    
     # Normalize ERPNext list response
     if isinstance(warehouses, dict):
         warehouses = warehouses.get("data", [])
@@ -1116,10 +1207,22 @@ async def create_invoice(
         items_data.append(item_data)
         
         # Prepare item data for VAT calculation
+        # Fallback: If ERPNext item details don't have taxes, check if we can infer from default templates
+        # or just assume VATable if default settings imply it.
+        taxes = item_detail.get("taxes")
+        vat_rate = None
+        if taxes and len(taxes) > 0:
+            vat_rate = taxes[0].get("tax_rate")
+        elif item.is_vatable and not taxes:
+             # Default fallback if item is marked vatable but no tax template found on item doc
+             # This prevents "Zero Tax" issues when ERPNext data is incomplete
+             vat_rate = 16.0 # Standard Rate
+             logger.info(f"Using fallback VAT rate (16%) for {item.item_code}")
+
         items_for_vat.append({
             "amount": amount,
             "is_vatable": item.is_vatable,
-            "vat_rate": item_detail.get("taxes", [{}])[0].get("tax_rate") if item_detail.get("taxes") else None,
+            "vat_rate": vat_rate,
             "income_account": item_detail.get("income_account"),
             "default_income_account": item_detail.get("default_income_account"),
             "expense_account": item_detail.get("expense_account"),

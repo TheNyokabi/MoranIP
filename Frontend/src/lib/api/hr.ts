@@ -3,7 +3,7 @@
  * Uses new /api/hr path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface Employee {
     name: string;

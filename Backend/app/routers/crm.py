@@ -19,9 +19,14 @@ router = APIRouter(
 )
 
 
-def check_permission(payload: dict, action: str, doctype: str = ""):
-    """Check CRM permission."""
-    tenant_id = payload.get("tenant_id")
+def check_permission(tenant_id: str, action: str, doctype: str = ""):
+    """Check CRM permission.
+    
+    Args:
+        tenant_id: The tenant_id resolved by require_tenant_access (from token or X-Tenant-ID header)
+        action: The action being performed (view, create, update, delete)
+        doctype: The ERPNext doctype being accessed
+    """
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Tenant access required")
     return True
@@ -79,7 +84,7 @@ def list_customer_groups(
     payload: dict = Depends(get_current_token_payload),
 ):
     """List Customer Groups."""
-    check_permission(payload, "view", "Customer Group")
+    check_permission(tenant_id, "view", "Customer Group")
     result = erpnext_adapter.list_resource("Customer Group", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -91,7 +96,7 @@ def create_customer_group(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Create Customer Group."""
-    check_permission(payload, "create", "Customer Group")
+    check_permission(tenant_id, "create", "Customer Group")
     result = erpnext_adapter.create_resource("Customer Group", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -103,7 +108,7 @@ def get_customer_group(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Get Customer Group details."""
-    check_permission(payload, "view", "Customer Group")
+    check_permission(tenant_id, "view", "Customer Group")
     group = erpnext_adapter.get_resource("Customer Group", group_name, tenant_id)
     if not group:
         raise HTTPException(status_code=404, detail="Customer Group not found")
@@ -118,7 +123,7 @@ def update_customer_group(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Update Customer Group."""
-    check_permission(payload, "edit", "Customer Group")
+    check_permission(tenant_id, "edit", "Customer Group")
     result = erpnext_adapter.update_resource("Customer Group", group_name, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -130,7 +135,7 @@ def delete_customer_group(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Customer Group."""
-    check_permission(payload, "delete", "Customer Group")
+    check_permission(tenant_id, "delete", "Customer Group")
     erpnext_adapter.delete_resource("Customer Group", group_name, tenant_id)
     return None
 
@@ -142,7 +147,7 @@ def list_territories(
     payload: dict = Depends(get_current_token_payload),
 ):
     """List Territories."""
-    check_permission(payload, "view", "Territory")
+    check_permission(tenant_id, "view", "Territory")
     result = erpnext_adapter.list_resource("Territory", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -154,7 +159,7 @@ def create_territory(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Create Territory."""
-    check_permission(payload, "create", "Territory")
+    check_permission(tenant_id, "create", "Territory")
     result = erpnext_adapter.create_resource("Territory", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -166,7 +171,7 @@ def get_territory(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Get Territory details."""
-    check_permission(payload, "view", "Territory")
+    check_permission(tenant_id, "view", "Territory")
     territory = erpnext_adapter.get_resource("Territory", territory_name, tenant_id)
     if not territory:
         raise HTTPException(status_code=404, detail="Territory not found")
@@ -181,7 +186,7 @@ def update_territory(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Update Territory."""
-    check_permission(payload, "edit", "Territory")
+    check_permission(tenant_id, "edit", "Territory")
     result = erpnext_adapter.update_resource("Territory", territory_name, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -193,7 +198,7 @@ def delete_territory(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Territory."""
-    check_permission(payload, "delete", "Territory")
+    check_permission(tenant_id, "delete", "Territory")
     erpnext_adapter.delete_resource("Territory", territory_name, tenant_id)
     return None
 
@@ -205,7 +210,7 @@ def list_sales_persons(
     payload: dict = Depends(get_current_token_payload),
 ):
     """List Sales Persons."""
-    check_permission(payload, "view", "Sales Person")
+    check_permission(tenant_id, "view", "Sales Person")
     result = erpnext_adapter.list_resource("Sales Person", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -218,7 +223,7 @@ def create_sales_person(
     db: Session = Depends(get_db),
 ):
     """Create Sales Person."""
-    check_permission(payload, "create", "Sales Person")
+    check_permission(tenant_id, "create", "Sales Person")
     result = _create_with_human_readable_name(
         tenant_id=tenant_id,
         doctype="Sales Person",
@@ -236,7 +241,7 @@ def get_sales_person(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Get Sales Person details."""
-    check_permission(payload, "view", "Sales Person")
+    check_permission(tenant_id, "view", "Sales Person")
     sp = erpnext_adapter.get_resource("Sales Person", sales_person_name, tenant_id)
     if not sp:
         raise HTTPException(status_code=404, detail="Sales Person not found")
@@ -251,7 +256,7 @@ def update_sales_person(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Update Sales Person."""
-    check_permission(payload, "edit", "Sales Person")
+    check_permission(tenant_id, "edit", "Sales Person")
     result = erpnext_adapter.update_resource("Sales Person", sales_person_name, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -263,7 +268,7 @@ def delete_sales_person(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Sales Person."""
-    check_permission(payload, "delete", "Sales Person")
+    check_permission(tenant_id, "delete", "Sales Person")
     erpnext_adapter.delete_resource("Sales Person", sales_person_name, tenant_id)
     return None
 
@@ -281,7 +286,7 @@ def list_contacts(
     
     Query parameters: filters, fields, limit_page_length
     """
-    check_permission(payload, "view", "Contact")
+    check_permission(tenant_id, "view", "Contact")
     result = erpnext_adapter.list_resource("Contact", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -301,7 +306,7 @@ def create_contact(
     - email_id: str (optional but recommended)
     - is_primary_contact: bool
     """
-    check_permission(payload, "create", "Contact")
+    check_permission(tenant_id, "create", "Contact")
     result = _create_with_human_readable_name(
         tenant_id=tenant_id,
         doctype="Contact",
@@ -319,7 +324,7 @@ def get_contact(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Contact details."""
-    check_permission(payload, "view", "Contact")
+    check_permission(tenant_id, "view", "Contact")
     contact = erpnext_adapter.get_resource("Contact", contact_name, tenant_id)
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
@@ -334,7 +339,7 @@ def update_contact(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Contact details."""
-    check_permission(payload, "edit", "Contact")
+    check_permission(tenant_id, "edit", "Contact")
     result = erpnext_adapter.update_resource("Contact", contact_name, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -346,7 +351,7 @@ def delete_contact(
     payload: dict = Depends(get_current_token_payload),
 ):
     """Delete Contact."""
-    check_permission(payload, "delete", "Contact")
+    check_permission(tenant_id, "delete", "Contact")
     erpnext_adapter.delete_resource("Contact", contact_name, tenant_id)
     return None
 
@@ -364,7 +369,7 @@ def list_leads(
     
     Leads are potential customers with contact information
     """
-    check_permission(payload, "view", "Lead")
+    check_permission(tenant_id, "view", "Lead")
     result = erpnext_adapter.list_resource("Lead", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -384,7 +389,7 @@ def create_lead(
     - email_id: str (optional)
     - status: "Open" | "Converted" | "Junk" | "Lost"
     """
-    check_permission(payload, "create", "Lead")
+    check_permission(tenant_id, "create", "Lead")
     result = _create_with_human_readable_name(
         tenant_id=tenant_id,
         doctype="Lead",
@@ -410,7 +415,7 @@ def get_lead(
     - Sales info (source, rating, industry)
     - Timeline (creation/modification dates)
     """
-    check_permission(payload, "view", "Lead")
+    check_permission(tenant_id, "view", "Lead")
     lead = erpnext_adapter.get_resource("Lead", lead_name, tenant_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -435,7 +440,7 @@ def update_lead(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Lead details."""
-    check_permission(payload, "edit", "Lead")
+    check_permission(tenant_id, "edit", "Lead")
     result = erpnext_adapter.update_resource("Lead", lead_name, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -454,7 +459,7 @@ def convert_lead(
     - to_customer: bool (create Customer)
     - customer_name: str (if to_customer=true)
     """
-    check_permission(payload, "edit", "Lead")
+    check_permission(tenant_id, "edit", "Lead")
     
     lead = erpnext_adapter.get_resource("Lead", lead_name, tenant_id)
     if not lead:
@@ -481,7 +486,7 @@ def delete_lead(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete Lead."""
-    check_permission(payload, "delete", "Lead")
+    check_permission(tenant_id, "delete", "Lead")
     erpnext_adapter.delete_resource("Lead", lead_name, tenant_id)
     return None
 
@@ -499,7 +504,7 @@ def list_customers(
     
     Customers are accounts converted from Leads
     """
-    check_permission(payload, "view", "Customer")
+    check_permission(tenant_id, "view", "Customer")
     result = erpnext_adapter.list_resource("Customer", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -518,7 +523,7 @@ def create_customer(
     - customer_type: "Individual" | "Company"
     - customer_group: str
     """
-    check_permission(payload, "create", "Customer")
+    check_permission(tenant_id, "create", "Customer")
     result = erpnext_adapter.create_resource("Customer", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -530,7 +535,7 @@ def get_customer(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Customer details including addresses, contacts, and order history."""
-    check_permission(payload, "view", "Customer")
+    check_permission(tenant_id, "view", "Customer")
     customer = erpnext_adapter.get_resource("Customer", customer_name, tenant_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -585,7 +590,7 @@ def update_customer(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Customer details."""
-    check_permission(payload, "edit", "Customer")
+    check_permission(tenant_id, "edit", "Customer")
     result = erpnext_adapter.update_resource("Customer", customer_name, data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -598,7 +603,7 @@ def get_customer_orders(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get recent orders for this customer."""
-    check_permission(payload, "view", "Sales Invoice")
+    check_permission(tenant_id, "view", "Sales Invoice")
     
     orders = erpnext_adapter.list_resource(
         "Sales Invoice",
@@ -624,7 +629,7 @@ def delete_customer(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Delete Customer (only if no outstanding transactions)."""
-    check_permission(payload, "delete", "Customer")
+    check_permission(tenant_id, "delete", "Customer")
     
     # Check if customer has any invoices
     invoices = erpnext_adapter.list_resource(
@@ -652,7 +657,7 @@ def list_opportunities(
     payload: dict = Depends(get_current_token_payload)
 ):
     """List Sales Opportunities."""
-    check_permission(payload, "view", "Opportunity")
+    check_permission(tenant_id, "view", "Opportunity")
     result = erpnext_adapter.list_resource("Opportunity", tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -672,7 +677,7 @@ def create_opportunity(
     - opportunity_amount: float
     - probability: 0-100
     """
-    check_permission(payload, "create", "Opportunity")
+    check_permission(tenant_id, "create", "Opportunity")
     result = erpnext_adapter.create_resource("Opportunity", data, tenant_id)
     return ResponseNormalizer.normalize_erpnext(result)
 
@@ -684,7 +689,7 @@ def get_opportunity(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Get Opportunity details."""
-    check_permission(payload, "view", "Opportunity")
+    check_permission(tenant_id, "view", "Opportunity")
     opportunity = erpnext_adapter.get_resource("Opportunity", opportunity_name, tenant_id)
     if not opportunity:
         raise HTTPException(status_code=404, detail="Opportunity not found")
@@ -699,5 +704,5 @@ def update_opportunity(
     payload: dict = Depends(get_current_token_payload)
 ):
     """Update Opportunity (e.g., change probability/amount)."""
-    check_permission(payload, "edit", "Opportunity")
+    check_permission(tenant_id, "edit", "Opportunity")
     return erpnext_adapter.update_resource("Opportunity", opportunity_name, data, tenant_id)

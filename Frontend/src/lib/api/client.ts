@@ -1,6 +1,10 @@
 // Enhanced API Client with Security and Session Handling
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
+// Use relative URLs in browser to route through Next.js proxy
+// Use full URL on server for SSR
+const API_BASE_URL = typeof window !== 'undefined'
+    ? '' // Browser: use relative URLs through Next.js proxy at /api
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000');
 
 // Token management
 export function getAuthToken(): string | null {
@@ -27,6 +31,7 @@ function getAuthHeaders(endpoint?: string): HeadersInit {
     };
 
     // Add X-Tenant-ID header for tenant-scoped endpoints
+    // Note: Backend accepts both tenant_id (UUID) and tenant_code (slug like TEN-KE-26-XYZ)
     if (typeof window !== 'undefined' && endpoint) {
         const isTenantScoped =
             endpoint.includes('/inventory/') ||
@@ -35,27 +40,43 @@ function getAuthHeaders(endpoint?: string): HeadersInit {
             endpoint.includes('/onboarding/') ||
             endpoint.includes('/provisioning/') ||
             endpoint.includes('/erpnext/') ||
-            endpoint.includes('/erp/');
+            endpoint.includes('/erp/') ||
+            endpoint.includes('/purchases/') ||
+            endpoint.includes('/accounting/') ||
+            endpoint.includes('/crm/') ||
+            endpoint.includes('/hr/') ||
+            endpoint.includes('/manufacturing/') ||
+            endpoint.includes('/projects/') ||
+            endpoint.includes('/sales/') ||
+            endpoint.includes('/support/') ||
+            endpoint.includes('/assets/') ||
+            endpoint.includes('/quality/') ||
+            endpoint.includes('/paint/');
 
         if (isTenantScoped) {
-            // Try to get tenant ID from auth store
+            // Try to get tenant SLUG (code) from auth store - prefer slug over ID for consistency
             try {
                 const { useAuthStore } = require('@/store/auth-store');
                 const authState = useAuthStore.getState();
-                const tenantId = authState.currentTenant?.id || null;
+                // Prefer code (slug) over ID for URL consistency
+                const tenantSlug = authState.currentTenant?.code || authState.currentTenant?.id || null;
 
                 // Fallback: try to get from URL if in workspace route
-                if (!tenantId) {
+                if (!tenantSlug) {
                     const pathMatch = window.location.pathname.match(/^\/w\/([^\/]+)/);
                     if (pathMatch) {
                         const { availableTenants } = authState;
                         const tenant = availableTenants?.find((t: any) => t.code === pathMatch[1] || t.id === pathMatch[1]);
                         if (tenant) {
-                            (headers as Record<string, string>)['X-Tenant-ID'] = tenant.id;
+                            // Prefer slug (code) over ID
+                            (headers as Record<string, string>)['X-Tenant-ID'] = tenant.code || tenant.id;
+                        } else {
+                            // Use the slug directly from URL
+                            (headers as Record<string, string>)['X-Tenant-ID'] = pathMatch[1];
                         }
                     }
                 } else {
-                    (headers as Record<string, string>)['X-Tenant-ID'] = tenantId;
+                    (headers as Record<string, string>)['X-Tenant-ID'] = tenantSlug;
                 }
             } catch (e) {
                 // Auth store not available, skip tenant ID
@@ -128,15 +149,17 @@ async function secureFetch(
         // Extract endpoint from URL for tenant context detection
         const endpoint = url.replace(API_BASE_URL, '');
         const headers: Record<string, string> = { ...getAuthHeaders(endpoint) as Record<string, string> };
-        const tenantId = headers['X-Tenant-ID'] || null;
+        // X-Tenant-ID now contains tenant slug (code) for URL consistency
+        const tenantSlug = headers['X-Tenant-ID'] || null;
 
         let finalUrl = url;
         // Rewrite module endpoints to include tenant scope in URL path if not already present
-        if (tenantId && !endpoint.includes('/tenants/')) {
+        // Uses tenant slug for consistent URLs across the application
+        if (tenantSlug && !endpoint.includes('/tenants/')) {
             const erpModules = [
                 '/inventory', '/purchases', '/accounting', '/crm', '/hr',
                 '/paint', '/manufacturing', '/projects', '/sales',
-                '/support', '/assets', '/quality', '/permissions'
+                '/support', '/assets', '/quality', '/permissions', '/pos'
             ];
             const tenantModules = [
                 '/reports', '/commissions', '/dashboard', '/files'
@@ -153,7 +176,8 @@ async function secureFetch(
 
             for (const prefix of erpModules) {
                 if (pathToCheck.startsWith(prefix)) {
-                    targetPath = `/api/tenants/${tenantId}/erp${pathToCheck}`;
+                    // Use tenant slug in URL for consistency
+                    targetPath = `/api/tenants/${tenantSlug}/erp${pathToCheck}`;
                     identified = true;
                     break;
                 }
@@ -162,7 +186,8 @@ async function secureFetch(
             if (!identified) {
                 for (const prefix of tenantModules) {
                     if (pathToCheck.startsWith(prefix)) {
-                        targetPath = `/api/tenants/${tenantId}${pathToCheck}`;
+                        // Use tenant slug in URL for consistency
+                        targetPath = `/api/tenants/${tenantSlug}${pathToCheck}`;
                         identified = true;
                         break;
                     }
@@ -172,6 +197,11 @@ async function secureFetch(
             if (identified) {
                 finalUrl = `${API_BASE_URL}${targetPath}`;
             }
+        }
+
+        // In browser, ensure URLs go through Next.js proxy with /api prefix
+        if (typeof window !== 'undefined' && !finalUrl.startsWith('/api') && !finalUrl.startsWith('http')) {
+            finalUrl = `/api${finalUrl}`;
         }
 
         const response = await fetch(finalUrl, {

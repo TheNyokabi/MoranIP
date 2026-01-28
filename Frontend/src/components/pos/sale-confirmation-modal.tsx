@@ -44,6 +44,8 @@ interface SaleConfirmationModalProps {
     discount: number;
     total: number;
     isProcessing: boolean;
+    amountTendered?: number;
+    changeAmount?: number;
 }
 
 const PAYMENT_ICONS: Record<string, React.ReactNode> = {
@@ -64,6 +66,8 @@ export function SaleConfirmationModal({
     discount,
     total,
     isProcessing,
+    amountTendered,
+    changeAmount,
 }: SaleConfirmationModalProps) {
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -155,6 +159,23 @@ export function SaleConfirmationModal({
                         <span className="text-primary">KES {total.toLocaleString()}</span>
                     </div>
                 </div>
+
+                {/* Cash Payment Details */}
+                {paymentMethod === 'Cash' && amountTendered !== undefined && amountTendered > 0 && (
+                    <>
+                        <Separator />
+                        <div className="space-y-2 bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Amount Tendered</span>
+                                <span className="font-medium">KES {amountTendered.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-lg font-bold text-emerald-600">
+                                <span>Change Due</span>
+                                <span>KES {(changeAmount || 0).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 <DialogFooter className="mt-4 gap-2 sm:gap-0">
                     <Button

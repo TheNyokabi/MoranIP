@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey, Integer, TIMESTAMP, text, UniqueConstraint, Index, Text
+from sqlalchemy import Column, String, Boolean, ForeignKey, Integer, TIMESTAMP, text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
@@ -43,23 +43,11 @@ class Tenant(Base):
     country_code = Column(String(2), default='KE')
     status = Column(String(20), default='ACTIVE')
     engine = Column(String(20), default='odoo')
-    
-    # Provisioning status tracking
-    provisioning_status = Column(String(20), default='NOT_PROVISIONED')  # NOT_PROVISIONED, PROVISIONING, PROVISIONED, FAILED, PARTIAL
-    provisioned_at = Column(TIMESTAMP(timezone=True), nullable=True)
-    provisioning_error = Column(Text, nullable=True)  # Last error message
-    
     created_at = Column(TIMESTAMP(timezone=True), server_default=text('now()'))
 
     memberships = relationship("Membership", back_populates="tenant")
-    
-    __table_args__ = (
-        Index('idx_tenants_provisioning_status', 'provisioning_status'),
-    )
     staff_profiles = relationship("StaffProfile", back_populates="tenant")
     tenant_settings = relationship("TenantSettings", back_populates="tenant", uselist=False, cascade="all, delete-orphan")
-    security_settings = relationship("TenantSecuritySettings", back_populates="tenant", uselist=False, cascade="all, delete-orphan")
-    notification_settings = relationship("TenantNotificationSettings", back_populates="tenant", uselist=False, cascade="all, delete-orphan")
 
 class Membership(Base):
     __tablename__ = "memberships"
@@ -170,81 +158,3 @@ class TenantSettings(Base):
     
     tenant = relationship("Tenant", back_populates="tenant_settings")
 
-class TenantSecuritySettings(Base):
-    __tablename__ = "tenant_security_settings"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), unique=True, nullable=False)
-    
-    # Password Policies
-    min_password_length = Column(Integer, default=8)
-    require_uppercase = Column(Boolean, default=True)
-    require_lowercase = Column(Boolean, default=True)
-    require_numbers = Column(Boolean, default=True)
-    require_special_chars = Column(Boolean, default=False)
-    password_expiry_days = Column(Integer, default=90)  # 0 = no expiry
-    
-    # Session Management
-    session_timeout_minutes = Column(Integer, default=30)
-    max_concurrent_sessions = Column(Integer, default=5)
-    require_mfa = Column(Boolean, default=False)
-    
-    # Access Control
-    ip_whitelist_enabled = Column(Boolean, default=False)
-    ip_whitelist = Column(JSONB, default=list)  # Array of IP addresses/CIDR blocks
-    block_suspicious_activity = Column(Boolean, default=True)
-    
-    # Audit & Logging
-    enable_audit_log = Column(Boolean, default=True)
-    log_failed_login_attempts = Column(Boolean, default=True)
-    log_sensitive_operations = Column(Boolean, default=True)
-    
-    created_at = Column(TIMESTAMP(timezone=True), server_default=text('now()'))
-    updated_at = Column(TIMESTAMP(timezone=True), server_default=text('now()'), onupdate=text('now()'))
-    
-    tenant = relationship("Tenant", back_populates="security_settings")
-
-class TenantNotificationSettings(Base):
-    __tablename__ = "tenant_notification_settings"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), unique=True, nullable=False)
-    
-    # Email Notifications
-    email_enabled = Column(Boolean, default=True)
-    email_new_user_invite = Column(Boolean, default=True)
-    email_role_changes = Column(Boolean, default=True)
-    email_payment_received = Column(Boolean, default=True)
-    email_invoice_generated = Column(Boolean, default=True)
-    email_order_status_change = Column(Boolean, default=True)
-    email_low_stock_alert = Column(Boolean, default=True)
-    email_monthly_report = Column(Boolean, default=True)
-    
-    # In-App Notifications
-    in_app_enabled = Column(Boolean, default=True)
-    in_app_new_messages = Column(Boolean, default=True)
-    in_app_task_assignments = Column(Boolean, default=True)
-    in_app_approval_requests = Column(Boolean, default=True)
-    in_app_system_updates = Column(Boolean, default=True)
-    
-    # SMS Notifications
-    sms_enabled = Column(Boolean, default=False)
-    sms_order_confirmation = Column(Boolean, default=False)
-    sms_payment_received = Column(Boolean, default=False)
-    sms_important_alerts = Column(Boolean, default=False)
-    
-    # Push Notifications
-    push_enabled = Column(Boolean, default=True)
-    push_instant_alerts = Column(Boolean, default=True)
-    push_daily_summary = Column(Boolean, default=False)
-    
-    # Notification Preferences
-    quiet_hours_enabled = Column(Boolean, default=False)
-    quiet_hours_start = Column(String(5), default='22:00')  # HH:MM format
-    quiet_hours_end = Column(String(5), default='08:00')  # HH:MM format
-    digest_frequency = Column(String(10), default='daily')  # none, daily, weekly
-    
-    created_at = Column(TIMESTAMP(timezone=True), server_default=text('now()'))
-    updated_at = Column(TIMESTAMP(timezone=True), server_default=text('now()'), onupdate=text('now()'))
-    
-    tenant = relationship("Tenant", back_populates="notification_settings")

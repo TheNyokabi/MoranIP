@@ -3,7 +3,7 @@
  * Uses new /api/crm path structure
  */
 
-import { apiFetch } from '../api';
+import { apiFetch } from './core';
 
 export interface Contact {
     name: string;

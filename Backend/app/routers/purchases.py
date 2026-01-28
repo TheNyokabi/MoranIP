@@ -341,6 +341,81 @@ async def get_purchase_receipt(
     return result
 
 
+@router.put("/receipts/{receipt_id}")
+async def update_purchase_receipt(
+    receipt_id: str,
+    data: dict,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+    engine: str = Depends(get_tenant_engine)
+):
+    """
+    Update a purchase receipt (only allowed in Draft status).
+    
+    Can update items, posting date, and other metadata before submission.
+    """
+    service = get_purchase_service(engine)
+    
+    try:
+        result = await service.update_purchase_receipt(tenant_id, receipt_id, data)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/receipts/{receipt_id}/submit")
+async def submit_purchase_receipt(
+    receipt_id: str,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+    engine: str = Depends(get_tenant_engine)
+):
+    """
+    Submit a purchase receipt to update inventory.
+    
+    This is a critical step in the purchase flow:
+    - The receipt must be in Draft status
+    - Submitting creates Stock Ledger Entries
+    - Inventory quantities are updated in the specified warehouses
+    
+    Purchase Flow:
+    1. Purchase Order (Draft) → Submit → Purchase Order (Submitted)
+    2. Create Purchase Receipt (Draft) → Submit → Purchase Receipt (Submitted) ← THIS ENDPOINT
+    3. Inventory is now updated with received goods
+    """
+    service = get_purchase_service(engine)
+    
+    try:
+        result = await service.submit_purchase_receipt(tenant_id, receipt_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/receipts/{receipt_id}/cancel")
+async def cancel_purchase_receipt(
+    receipt_id: str,
+    tenant_id: str = Depends(require_tenant_access),
+    current_user: dict = Depends(get_current_user),
+    engine: str = Depends(get_tenant_engine)
+):
+    """
+    Cancel a submitted purchase receipt.
+    
+    This reverses the inventory changes:
+    - The receipt must be in Submitted status
+    - Cancelling creates reverse Stock Ledger Entries
+    - Inventory quantities are restored to previous values
+    """
+    service = get_purchase_service(engine)
+    
+    try:
+        result = await service.cancel_purchase_receipt(tenant_id, receipt_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ==================== Purchase Invoice Endpoints ====================
 
 @router.post("/invoices")

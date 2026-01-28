@@ -91,7 +91,7 @@ export default function CreateWorkspacePage() {
             const { iamApi } = await import('@/lib/api');
             const token = useAuthStore.getState().token;
 
-            const data = await iamApi.createTenant({
+            const data: any = await iamApi.createTenant({
                 name: formData.name,
                 category: formData.category,
                 description: formData.description,
