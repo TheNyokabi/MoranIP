@@ -7,6 +7,8 @@ from app.config import settings
 from app.services.engine_adapter import EngineAdapter
 from app.middleware.response_normalizer import ResponseNormalizer
 from typing import Dict, Optional
+from decimal import Decimal
+import json
 
 
 class ERPNextClientAdapter(EngineAdapter):
@@ -165,6 +167,24 @@ class ERPNextClientAdapter(EngineAdapter):
         }
         # Remove None values
         headers = {k: v for k, v in headers.items() if v is not None}
+
+        # Helper to convert Decimal to float for JSON serialization
+        def _convert_decimals(obj):
+            if isinstance(obj, dict):
+                return {k: _convert_decimals(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [_convert_decimals(v) for v in obj]
+            elif isinstance(obj, tuple):
+                return tuple(_convert_decimals(v) for v in obj)
+            elif isinstance(obj, Decimal):
+                return float(obj)
+            return obj
+
+        if json_data:
+            # print(f"DEBUG: Converting json_data decimals. Type: {type(json_data)}")
+            json_data = _convert_decimals(json_data)
+        if params:
+            params = _convert_decimals(params)
 
         try:
             resp = self.session.request(
@@ -545,12 +565,16 @@ class ERPNextClientAdapter(EngineAdapter):
             # ERPNext returns {"message": {...}} for success or {"data": {...}}
             try:
                 response_json = resp.json()
+                # print(f"DEBUG_ERPNEXT_RESPONSE: {json.dumps(response_json)}")
+
+                # If already has "data", return as-is (Prioritize data over message)
+                if isinstance(response_json, dict) and "data" in response_json:
+                    return response_json
+
                 # If response has "message" key, extract it (ERPNext standard format)
                 if isinstance(response_json, dict) and "message" in response_json:
                     return {"data": response_json["message"]}
-                # If already has "data", return as-is
-                if isinstance(response_json, dict) and "data" in response_json:
-                    return response_json
+
                 # Otherwise wrap in "data"
                 return {"data": response_json}
             except (ValueError, KeyError):

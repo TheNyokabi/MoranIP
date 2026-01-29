@@ -264,36 +264,36 @@ export default function POSPage() {
     useEffect(() => {
         async function fetchBulkStock() {
             if (!token || !selectedPosProfile || items.length === 0) return
-            
+
             try {
                 const itemCodes = items.map(i => i.item_code).filter(Boolean)
                 if (itemCodes.length === 0) return
-                
+
                 console.log('[POS] Fetching bulk stock for', itemCodes.length, 'items with profile:', selectedPosProfile)
-                const stockRes = await posApi.getBulkStock(token, { 
-                    pos_profile_id: selectedPosProfile, 
-                    item_codes: itemCodes 
+                const stockRes = await posApi.getBulkStock(token, {
+                    pos_profile_id: selectedPosProfile,
+                    item_codes: itemCodes
                 })
-                
+
                 const qtyByItem = new Map<string, number | undefined>()
                 for (const row of stockRes.stocks || []) {
                     if (row?.item_code) {
                         // Backend returns null for unknown stock, number for known stock
-                        const qty = row.qty === null || row.qty === undefined 
-                            ? undefined 
+                        const qty = row.qty === null || row.qty === undefined
+                            ? undefined
                             : Number(row.qty)
                         qtyByItem.set(row.item_code, qty)
                     }
                 }
-                
+
                 const knownCount = Array.from(qtyByItem.values()).filter(v => v !== undefined).length
                 console.log('[POS] Stock data received:', knownCount, 'with stock,', qtyByItem.size - knownCount, 'unknown')
-                
+
                 setItems(prev => (prev || []).map(it => {
                     // Use stock data if available, keep undefined for unknown stock
                     // This ensures items with unknown stock remain visible
-                    const stockQty = qtyByItem.has(it.item_code) 
-                        ? qtyByItem.get(it.item_code) 
+                    const stockQty = qtyByItem.has(it.item_code)
+                        ? qtyByItem.get(it.item_code)
                         : (it.stock_qty ?? undefined)
                     return {
                         ...it,
@@ -305,7 +305,7 @@ export default function POSPage() {
                 // Non-fatal: grid still works, items remain visible with undefined stock
             }
         }
-        
+
         fetchBulkStock()
     }, [token, selectedPosProfile, items.length]) // Re-fetch when profile changes or items load
 
@@ -459,7 +459,7 @@ export default function POSPage() {
             toast.error('Please select a POS Profile before processing sale')
             return
         }
-        
+
         if (selectedPayment === 'Cash') {
             // Show cash payment modal for amount tendered and change calculation
             setShowCashPaymentModal(true)
@@ -493,8 +493,10 @@ export default function POSPage() {
             }
 
             const result = await posApi.createInvoice(token, invoice)
-            setLastInvoice(result)
-            setLastInvoiceId(result.name)
+            // Backend returns {data: POSInvoice}, extract inner data
+            const invoiceData = (result as any).data || result
+            setLastInvoice(invoiceData)
+            setLastInvoiceId(invoiceData.name)
             clearCart()
             setLoyaltyDiscount(0)
             setProcessing(false)
@@ -539,10 +541,12 @@ export default function POSPage() {
             }
 
             const result = await posApi.createInvoice(token, invoice)
-            setLastInvoice(result)
+            // Backend returns {data: POSInvoice}, extract inner data
+            const invoiceData = (result as any).data || result
+            setLastInvoice(invoiceData)
 
             // Store invoice ID for receipt preview
-            setLastInvoiceId(result.name)
+            setLastInvoiceId(invoiceData.name)
 
             // Refresh data
             const [summaryRes, invoicesRes] = await Promise.all([

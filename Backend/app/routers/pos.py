@@ -1356,7 +1356,7 @@ async def create_invoice(
     
     # Validate payment amounts sum to grand total
     total_payments = sum(p.amount for p in invoice.payments)
-    grand_total = vat_result["total_amount"]
+    grand_total = float(vat_result["total_amount"])  # Convert Decimal to float for comparison
     
     # Allow small rounding differences (0.01)
     if abs(total_payments - grand_total) > 0.01:
