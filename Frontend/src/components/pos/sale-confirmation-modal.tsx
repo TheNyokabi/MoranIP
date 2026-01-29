@@ -20,7 +20,10 @@ import {
     Receipt,
     Loader2,
     CheckCircle2,
-    Tag
+    Tag,
+    Plus,
+    Minus,
+    Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +40,8 @@ interface SaleConfirmationModalProps {
     onClose: () => void;
     onConfirm: () => void;
     cart: CartItem[];
+    onUpdateQty?: (itemCode: string, delta: number) => void;
+    onRemoveItem?: (itemCode: string) => void;
     customer: string;
     customerType: string;
     paymentMethod: string;
@@ -46,6 +51,7 @@ interface SaleConfirmationModalProps {
     isProcessing: boolean;
     amountTendered?: number;
     changeAmount?: number;
+    currency?: string;
 }
 
 const PAYMENT_ICONS: Record<string, React.ReactNode> = {
@@ -59,6 +65,8 @@ export function SaleConfirmationModal({
     onClose,
     onConfirm,
     cart,
+    onUpdateQty,
+    onRemoveItem,
     customer,
     customerType,
     paymentMethod,
@@ -68,6 +76,7 @@ export function SaleConfirmationModal({
     isProcessing,
     amountTendered,
     changeAmount,
+    currency = 'KES',
 }: SaleConfirmationModalProps) {
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -85,7 +94,7 @@ export function SaleConfirmationModal({
                 <ScrollArea className="flex-1 max-h-[300px] pr-4">
                     {/* Order Items */}
                     <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-muted-foreground">Order Items</h4>
+                        <h4 className="text-sm font-medium text-muted-foreground">Confirm Quantities</h4>
                         {cart.map((item, index) => (
                             <div
                                 key={item.item_code}
@@ -97,12 +106,56 @@ export function SaleConfirmationModal({
                                 <div className="flex-1 min-w-0">
                                     <p className="font-medium truncate">{item.item_name}</p>
                                     <p className="text-sm text-muted-foreground">
-                                        {item.qty} × KES {item.rate.toLocaleString()}
+                                        {item.qty} × {currency} {item.rate.toLocaleString()}
                                     </p>
                                 </div>
-                                <p className="font-medium ml-4">
-                                    KES {item.total.toLocaleString()}
-                                </p>
+                                <div className="flex items-center gap-2 ml-4">
+                                    {onUpdateQty && (
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => onUpdateQty(item.item_code, -1)}
+                                                disabled={isProcessing}
+                                                aria-label="Decrease quantity"
+                                            >
+                                                <Minus className="h-4 w-4" />
+                                            </Button>
+                                            <span className="w-8 text-center text-sm font-semibold">{item.qty}</span>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => onUpdateQty(item.item_code, 1)}
+                                                disabled={isProcessing}
+                                                aria-label="Increase quantity"
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {onRemoveItem && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                            onClick={() => onRemoveItem(item.item_code)}
+                                            disabled={isProcessing}
+                                            aria-label="Remove item"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+
+                                    <p className="font-medium w-[110px] text-right">
+                                        {currency} {item.total.toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -142,7 +195,7 @@ export function SaleConfirmationModal({
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal</span>
-                        <span>KES {subtotal.toLocaleString()}</span>
+                        <span>{currency} {subtotal.toLocaleString()}</span>
                     </div>
                     {discount > 0 && (
                         <div className="flex justify-between text-sm text-green-600">
@@ -150,13 +203,13 @@ export function SaleConfirmationModal({
                                 <Tag className="h-3 w-3" />
                                 Loyalty Discount
                             </span>
-                            <span>- KES {discount.toLocaleString()}</span>
+                            <span>- {currency} {discount.toLocaleString()}</span>
                         </div>
                     )}
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                         <span>Total</span>
-                        <span className="text-primary">KES {total.toLocaleString()}</span>
+                        <span className="text-primary">{currency} {total.toLocaleString()}</span>
                     </div>
                 </div>
 
@@ -167,11 +220,11 @@ export function SaleConfirmationModal({
                         <div className="space-y-2 bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Amount Tendered</span>
-                                <span className="font-medium">KES {amountTendered.toLocaleString()}</span>
+                                <span className="font-medium">{currency} {amountTendered.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-lg font-bold text-emerald-600">
                                 <span>Change Due</span>
-                                <span>KES {(changeAmount || 0).toLocaleString()}</span>
+                                <span>{currency} {(changeAmount || 0).toLocaleString()}</span>
                             </div>
                         </div>
                     </>

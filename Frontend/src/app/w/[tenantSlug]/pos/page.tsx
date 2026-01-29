@@ -120,6 +120,11 @@ export default function POSPage() {
     const [amountTendered, setAmountTendered] = useState<number>(0)
     const [changeAmount, setChangeAmount] = useState<number>(0)
 
+    // Last completed sale payment context (for display/printing)
+    const [lastPaymentMethod, setLastPaymentMethod] = useState<string>('')
+    const [lastAmountTendered, setLastAmountTendered] = useState<number>(0)
+    const [lastChangeAmount, setLastChangeAmount] = useState<number>(0)
+
     // Paint sales state
     const [colorCodes, setColorCodes] = useState<any[]>([])
     const [selectedColorCode, setSelectedColorCode] = useState<string>('')
@@ -462,9 +467,13 @@ export default function POSPage() {
 
         if (selectedPayment === 'Cash') {
             // Show cash payment modal for amount tendered and change calculation
+            setAmountTendered(0)
+            setChangeAmount(0)
             setShowCashPaymentModal(true)
         } else {
             // For other payment methods, go directly to confirmation
+            setAmountTendered(0)
+            setChangeAmount(0)
             setShowConfirmationModal(true)
         }
     }
@@ -523,6 +532,10 @@ export default function POSPage() {
 
         setProcessing(true)
         try {
+            const paymentMethodUsed = selectedPayment
+            const amountTenderedUsed = paymentMethodUsed === 'Cash' ? amountTendered : 0
+            const changeAmountUsed = paymentMethodUsed === 'Cash' ? changeAmount : 0
+
             const invoice: POSInvoiceRequest = {
                 customer: selectedCustomer || 'Walk-in Customer', // Use selected customer or default
                 customer_type: customerType as any,
@@ -544,6 +557,11 @@ export default function POSPage() {
             // Backend returns {data: POSInvoice}, extract inner data
             const invoiceData = (result as any).data || result
             setLastInvoice(invoiceData)
+
+            // Capture payment context for the success screen before the cart resets
+            setLastPaymentMethod(paymentMethodUsed)
+            setLastAmountTendered(amountTenderedUsed)
+            setLastChangeAmount(changeAmountUsed)
 
             // Store invoice ID for receipt preview
             setLastInvoiceId(invoiceData.name)
@@ -1343,6 +1361,8 @@ export default function POSPage() {
                 }}
                 onConfirm={processSale}
                 cart={cart}
+                onUpdateQty={updateQty}
+                onRemoveItem={removeFromCart}
                 customer={selectedCustomer}
                 customerType={customerType}
                 paymentMethod={selectedPayment}
@@ -1352,21 +1372,33 @@ export default function POSPage() {
                 isProcessing={processing}
                 amountTendered={selectedPayment === 'Cash' ? amountTendered : undefined}
                 changeAmount={selectedPayment === 'Cash' ? changeAmount : undefined}
+                currency="KES"
             />
 
             {/* Sale Success Modal */}
             <SaleSuccessModal
                 open={showSuccessModal}
-                onClose={() => setShowSuccessModal(false)}
+                onClose={() => {
+                    setShowSuccessModal(false)
+                    setLastPaymentMethod('')
+                    setLastAmountTendered(0)
+                    setLastChangeAmount(0)
+                }}
                 onNewSale={() => {
                     setShowSuccessModal(false)
                     setLastInvoice(null)
+                    setLastPaymentMethod('')
+                    setLastAmountTendered(0)
+                    setLastChangeAmount(0)
                 }}
                 invoiceId={lastInvoiceId}
                 invoiceNumber={lastInvoice?.name || ''}
                 total={lastInvoice?.grand_total || 0}
                 customer={lastInvoice?.customer || selectedCustomer || 'Walk-in Customer'}
                 token={token || ''}
+                paymentMethod={lastPaymentMethod}
+                amountTendered={lastAmountTendered}
+                changeAmount={lastChangeAmount}
             />
 
             {/* End Session Modal */}

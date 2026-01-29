@@ -34,6 +34,9 @@ interface SaleSuccessModalProps {
     total: number;
     customer: string;
     token: string;
+    paymentMethod?: string;
+    amountTendered?: number;
+    changeAmount?: number;
 }
 
 export function SaleSuccessModal({
@@ -45,6 +48,9 @@ export function SaleSuccessModal({
     total,
     customer,
     token,
+    paymentMethod,
+    amountTendered,
+    changeAmount,
 }: SaleSuccessModalProps) {
     const [isPrinting, setIsPrinting] = useState(false);
     const [isEmailing, setIsEmailing] = useState(false);
@@ -195,6 +201,20 @@ export function SaleSuccessModal({
                             KES {total.toLocaleString()}
                         </span>
                     </div>
+
+                    {paymentMethod === 'Cash' && (amountTendered || 0) > 0 && (
+                        <>
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Cash Received</span>
+                                <span className="font-medium">KES {(amountTendered || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Change Due</span>
+                                <span className="font-bold text-emerald-600">KES {(changeAmount || 0).toLocaleString()}</span>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Receipt Actions */}

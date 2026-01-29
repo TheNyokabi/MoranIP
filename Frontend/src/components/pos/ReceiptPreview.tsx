@@ -33,6 +33,7 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
   const [format, setFormat] = useState<'html' | 'thermal' | 'pdf'>('html')
   const [language, setLanguage] = useState<'en' | 'sw'>('en')
   const [showPreview, setShowPreview] = useState(true)
+  const thermalWidth = 80
 
   // Load receipt on mount and when format/language changes
   useEffect(() => {
@@ -44,11 +45,11 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
   const loadReceipt = async () => {
     setLoading(true)
     try {
-      const response = await apiFetch(
-        `/pos/receipts/${invoiceId}?format=${format}&language=${language}`,
-        {},
-        token
-      )
+      const url = format === 'thermal'
+        ? `/pos/receipts/${invoiceId}/thermal?width=${thermalWidth}&language=${language}`
+        : `/pos/receipts/${invoiceId}?format=${format}&language=${language}`
+
+      const response = await apiFetch(url, {}, token)
       setReceiptData(response as ReceiptData)
     } catch (error) {
       console.error('Failed to load receipt:', error)
@@ -70,16 +71,37 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
       if (printWindow) {
         printWindow.document.write(receiptData.content)
         printWindow.document.close()
-        printWindow.print()
+        printWindow.focus()
+        setTimeout(() => {
+          printWindow.print()
+        }, 100)
       }
     } else if (format === 'thermal') {
-      // For thermal receipts, copy to clipboard for manual printing
-      navigator.clipboard.writeText(receiptData.content).then(() => {
-        toast({
-          title: "Copied to Clipboard",
-          description: "Thermal receipt copied. Paste into thermal printer software."
-        })
-      })
+      const printWindow = window.open('', '_blank')
+      if (printWindow) {
+        const safeText = receiptData.content
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Thermal Receipt - ${invoiceId}</title>
+              <style>
+                @page { margin: 0; }
+                body { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; margin: 0; padding: 10px; }
+                pre { white-space: pre-wrap; margin: 0; }
+              </style>
+            </head>
+            <body>
+              <pre>${safeText}</pre>
+              <script>window.print(); window.close();</script>
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+      }
     } else if (format === 'pdf') {
       // Download PDF
       const blob = new Blob([Uint8Array.from(atob(receiptData.content), c => c.charCodeAt(0))], { type: 'application/pdf' })

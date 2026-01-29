@@ -26,15 +26,50 @@ class ReceiptService:
         """Initialize Receipt Service"""
         pass
 
-    def _extract_total_vat(self, invoice_data: Dict[str, Any]) -> float:
-        """Normalize total VAT value from ERPNext payloads."""
-        value = invoice_data.get("total_taxes_and_charges", 0)
-        if isinstance(value, dict):
-            return float(value.get("total", 0) or 0)
+    def _to_decimal(self, value: Any) -> Decimal:
         try:
-            return float(value or 0)
-        except (TypeError, ValueError):
-            return 0.0
+            if value is None:
+                return Decimal("0")
+            if isinstance(value, Decimal):
+                return value
+            return Decimal(str(value))
+        except Exception:
+            return Decimal("0")
+
+    def _money(self, value: Any) -> Decimal:
+        return self._to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def _extract_total_taxes(self, invoice_data: Dict[str, Any]) -> Decimal:
+        """Normalize total taxes value from ERPNext payloads."""
+        value = invoice_data.get("total_taxes_and_charges", None)
+        if value is None:
+            value = invoice_data.get("total_tax_amount", 0)
+        if isinstance(value, dict):
+            return self._money(value.get("total", 0) or 0)
+        return self._money(value)
+
+    def _extract_tax_lines(self, invoice_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract tax rows from ERPNext invoice payload, if present."""
+        taxes = invoice_data.get("taxes", [])
+        if not isinstance(taxes, list):
+            return []
+
+        lines: List[Dict[str, Any]] = []
+        for tax in taxes:
+            if not isinstance(tax, dict):
+                continue
+            label = tax.get("description") or tax.get("account_head") or tax.get("charge_type") or "Tax"
+            amount = tax.get("tax_amount")
+            if amount is None:
+                amount = tax.get("base_tax_amount")
+            if amount is None:
+                continue
+            amount_dec = self._money(amount)
+            if amount_dec == 0:
+                continue
+            lines.append({"label": str(label), "amount": float(amount_dec)})
+
+        return lines
 
     def generate_thermal_receipt(
         self,
@@ -77,25 +112,38 @@ class ReceiptService:
         items = invoice_data.get("items", [])
         for item in items:
             item_name = item.get("item_name", item.get("item_code", "Unknown"))[:width//2]
-            qty = item.get("qty", 0)
-            rate = item.get("rate", 0)
-            amount = qty * rate
+            qty = self._to_decimal(item.get("qty", 0))
+            rate = self._to_decimal(item.get("rate", 0))
+            amount_raw = item.get("amount")
+            if amount_raw is None:
+                amount_raw = item.get("base_amount")
+            amount = self._money(amount_raw) if amount_raw is not None else self._money(qty * rate)
 
-            lines.append(f"{item_name:<{(width*2)//3}}{qty:<8}{amount:<10.2f}")
+            # Keep qty displayed as int when possible
+            qty_display = int(qty) if qty == int(qty) else float(qty)
+            lines.append(f"{item_name:<{(width*2)//3}}{qty_display:<8}{float(amount):<10.2f}")
 
         lines.append("-" * width)
 
         # Totals
-        total_qty = sum(item.get("qty", 0) for item in items)
-        net_total = invoice_data.get("net_total", 0)
-        total_vat = self._extract_total_vat(invoice_data)
-        grand_total = invoice_data.get("grand_total", 0)
+        total_qty = sum(self._to_decimal(item.get("qty", 0)) for item in items)
+        net_total = self._money(invoice_data.get("net_total", invoice_data.get("total", 0)))
+        tax_total = self._extract_total_taxes(invoice_data)
+        grand_total = self._money(invoice_data.get("grand_total", 0))
 
-        lines.append(f"{'Total Qty:':<{(width*3)//4}}{total_qty:>{width//4}}")
-        if total_vat > 0:
-            lines.append(f"{'Net Total:':<{(width*3)//4}}{net_total:>{width//4}.2f}")
-            lines.append(f"{'VAT (16%):':<{(width*3)//4}}{total_vat:>{width//4}.2f}")
-        lines.append(f"{'GRAND TOTAL:':<{(width*3)//4}}{grand_total:>{width//4}.2f}")
+        tax_lines = self._extract_tax_lines(invoice_data)
+
+        total_qty_display = int(total_qty) if total_qty == int(total_qty) else float(total_qty)
+        lines.append(f"{'Total Qty:':<{(width*3)//4}}{total_qty_display:>{width//4}}")
+        lines.append(f"{'Net Total:':<{(width*3)//4}}{float(net_total):>{width//4}.2f}")
+        if tax_lines:
+            for tax in tax_lines:
+                label = str(tax.get('label', 'Tax'))
+                amount = float(tax.get('amount', 0) or 0)
+                lines.append(f"{(label + ':'):<{(width*3)//4}}{amount:>{width//4}.2f}")
+        elif tax_total > 0:
+            lines.append(f"{'Tax:':<{(width*3)//4}}{float(tax_total):>{width//4}.2f}")
+        lines.append(f"{'GRAND TOTAL:':<{(width*3)//4}}{float(grand_total):>{width//4}.2f}")
 
         # Payments
         payments = invoice_data.get("payments", [])
@@ -201,36 +249,47 @@ class ReceiptService:
         items = invoice_data.get("items", [])
         for item in items:
             item_name = item.get("item_name", item.get("item_code", "Unknown"))
-            qty = item.get("qty", 0)
-            rate = item.get("rate", 0)
-            amount = qty * rate
+            qty = self._to_decimal(item.get("qty", 0))
+            rate = self._to_decimal(item.get("rate", 0))
+            amount_raw = item.get("amount")
+            if amount_raw is None:
+                amount_raw = item.get("base_amount")
+            amount = self._money(amount_raw) if amount_raw is not None else self._money(qty * rate)
+
+            qty_display = int(qty) if qty == int(qty) else float(qty)
 
             html += f"""
                     <tr>
                         <td>{item_name}</td>
-                        <td class="right">{qty}</td>
-                        <td class="right">{rate:.2f}</td>
-                        <td class="right">{amount:.2f}</td>
+                        <td class="right">{qty_display}</td>
+                        <td class="right">{float(self._money(rate)):.2f}</td>
+                        <td class="right">{float(amount):.2f}</td>
                     </tr>
             """
 
-        net_total = invoice_data.get("net_total", 0)
-        total_vat = self._extract_total_vat(invoice_data)
-        grand_total = invoice_data.get("grand_total", 0)
+        net_total = self._money(invoice_data.get("net_total", invoice_data.get("total", 0)))
+        tax_total = self._extract_total_taxes(invoice_data)
+        grand_total = self._money(invoice_data.get("grand_total", 0))
+        tax_lines = self._extract_tax_lines(invoice_data)
 
         html += f"""
                 </tbody>
             </table>
 
             <div class="total-row">
-                <p class="right">Net Total: {net_total:.2f}</p>
+                <p class="right">Net Total: {float(net_total):.2f}</p>
         """
 
-        if total_vat > 0:
-            html += f"""<p class="right">VAT (16%): {total_vat:.2f}</p>"""
+        if tax_lines:
+            for tax in tax_lines:
+                label = str(tax.get('label', 'Tax'))
+                amount = float(tax.get('amount', 0) or 0)
+                html += f"""<p class=\"right\">{label}: {amount:.2f}</p>"""
+        elif tax_total > 0:
+            html += f"""<p class=\"right\">Tax: {float(tax_total):.2f}</p>"""
 
         html += f"""
-                <p class="grand-total right">GRAND TOTAL: {grand_total:.2f}</p>
+                <p class="grand-total right">GRAND TOTAL: {float(grand_total):.2f}</p>
             </div>
         """
 
@@ -326,10 +385,15 @@ class ReceiptService:
 
         for item in items:
             item_name = item.get("item_name", item.get("item_code", "Unknown"))
-            qty = item.get("qty", 0)
-            rate = item.get("rate", 0)
-            amount = qty * rate
-            table_data.append([item_name, str(qty), f"{rate:.2f}", f"{amount:.2f}"])
+            qty = self._to_decimal(item.get("qty", 0))
+            rate = self._to_decimal(item.get("rate", 0))
+            amount_raw = item.get("amount")
+            if amount_raw is None:
+                amount_raw = item.get("base_amount")
+            amount = self._money(amount_raw) if amount_raw is not None else self._money(qty * rate)
+
+            qty_display = int(qty) if qty == int(qty) else float(qty)
+            table_data.append([item_name, str(qty_display), f"{float(self._money(rate)):.2f}", f"{float(amount):.2f}"])
 
         table = Table(table_data)
         table.setStyle(TableStyle([
@@ -347,15 +411,21 @@ class ReceiptService:
         story.append(Spacer(1, 12))
 
         # Totals
-        net_total = invoice_data.get("net_total", 0)
-        total_vat = self._extract_total_vat(invoice_data)
-        grand_total = invoice_data.get("grand_total", 0)
+        net_total = self._money(invoice_data.get("net_total", invoice_data.get("total", 0)))
+        tax_total = self._extract_total_taxes(invoice_data)
+        grand_total = self._money(invoice_data.get("grand_total", 0))
+        tax_lines = self._extract_tax_lines(invoice_data)
 
         totals_style = styles['Normal']
-        story.append(Paragraph(f"Net Total: {net_total:.2f}", totals_style))
-        if total_vat > 0:
-            story.append(Paragraph(f"VAT (16%): {total_vat:.2f}", totals_style))
-        story.append(Paragraph(f"<b>GRAND TOTAL: {grand_total:.2f}</b>", styles['Heading3']))
+        story.append(Paragraph(f"Net Total: {float(net_total):.2f}", totals_style))
+        if tax_lines:
+            for tax in tax_lines:
+                label = str(tax.get('label', 'Tax'))
+                amount = float(tax.get('amount', 0) or 0)
+                story.append(Paragraph(f"{label}: {amount:.2f}", totals_style))
+        elif tax_total > 0:
+            story.append(Paragraph(f"Tax: {float(tax_total):.2f}", totals_style))
+        story.append(Paragraph(f"<b>GRAND TOTAL: {float(grand_total):.2f}</b>", styles['Heading3']))
 
         doc.build(story)
         buffer.seek(0)
