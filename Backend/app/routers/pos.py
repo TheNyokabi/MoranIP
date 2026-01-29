@@ -160,19 +160,31 @@ async def list_items(
     if isinstance(items, dict):
         items = items.get("data", [])
     normalized_items = []
+    zero_rate_items = []
     for item in items or []:
         if not isinstance(item, dict):
             continue
         item_code = item.get("item_code") or item.get("name")
+        standard_rate = item.get("standard_rate") or 0
+        
+        # Track items with zero rates for warning
+        if standard_rate == 0:
+            zero_rate_items.append(item_code)
+        
         normalized_items.append({
             "item_code": item_code,
             "item_name": item.get("item_name") or item_code,
-            "standard_rate": item.get("standard_rate") or 0,
+            "standard_rate": standard_rate,
             "stock_uom": item.get("stock_uom") or "Nos",
             "is_stock_item": bool(item.get("is_stock_item")) if item.get("is_stock_item") is not None else None,
             "description": item.get("description"),
             "image": item.get("image")
         })
+    
+    # Log warning if items have zero rates
+    if zero_rate_items:
+        logger.warning(f"[POS] {len(zero_rate_items)} items have zero standard_rate: {zero_rate_items[:10]}{'...' if len(zero_rate_items) > 10 else ''}")
+    
     return {"items": normalized_items}
 
 
@@ -1136,6 +1148,12 @@ async def create_invoice(
         pick_account_by_type(["Bank"])
     )
 
+    # DEBUG: Log received invoice request
+    logger.info(f"[POS DEBUG] Received invoice request for tenant {tenant_id}")
+    logger.info(f"[POS DEBUG] Invoice items received:")
+    for idx, item in enumerate(invoice.items):
+        logger.info(f"  [{idx}] item_code={item.item_code}, qty={item.qty}, rate={item.rate}, is_vatable={item.is_vatable}")
+    
     # Prepare items with warehouse from profile and fetch item details
     items_data = []
     items_for_vat = []
@@ -1179,6 +1197,9 @@ async def create_invoice(
         # Get rate
         rate = item.rate or item_detail.get("standard_rate", 0)
         amount = rate * item.qty
+        
+        # DEBUG: Log rate calculation
+        logger.info(f"[POS DEBUG] Item {item.item_code}: frontend_rate={item.rate}, erpnext_standard_rate={item_detail.get('standard_rate')}, final_rate={rate}, qty={item.qty}, amount={amount}")
         
         # Prepare item data for invoice
         income_account = (
@@ -1440,6 +1461,15 @@ async def create_invoice(
             }
         )
     
+    # DEBUG: Log payload being sent to ERPNext
+    logger.info(f"[POS DEBUG] Payload being sent to ERPNext:")
+    logger.info(f"  Customer: {payload.get('customer')}")
+    logger.info(f"  Items ({len(payload.get('items', []))}):")
+    for idx, item in enumerate(payload.get('items', [])):
+        logger.info(f"    [{idx}] {item.get('item_code')}: qty={item.get('qty')}, rate={item.get('rate')}, amount={item.get('qty', 0) * item.get('rate', 0)}")
+    logger.info(f"  Payments: {payload.get('payments')}")
+    logger.info(f"  Taxes: {payload.get('taxes')}")
+    
     # Send to ERPNext
     try:
         result = erpnext_adapter.proxy_request(
@@ -1448,6 +1478,14 @@ async def create_invoice(
             method="POST",
             json_data=payload
         )
+        
+        # DEBUG: Log ERPNext response
+        logger.info(f"[POS DEBUG] ERPNext response received:")
+        if isinstance(result, dict):
+            logger.info(f"  Invoice name: {result.get('name')}")
+            logger.info(f"  Grand total: {result.get('grand_total')}")
+            logger.info(f"  Net total: {result.get('net_total')}")
+            logger.info(f"  Total taxes: {result.get('total_taxes_and_charges')}")
         logger.info(f"Invoice created successfully for tenant {tenant_id}, customer {invoice.customer}")
     except HTTPException:
         raise

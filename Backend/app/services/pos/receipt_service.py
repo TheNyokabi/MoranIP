@@ -5,6 +5,7 @@ Creates thermal printer receipts, HTML receipts, and handles delivery
 import qrcode
 import io
 import base64
+import html as html_lib
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
@@ -17,6 +18,9 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_COMPANY_NAME = "Company Name"
 
 
 class ReceiptService:
@@ -38,6 +42,9 @@ class ReceiptService:
 
     def _money(self, value: Any) -> Decimal:
         return self._to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def _escape_html(self, value: Any) -> str:
+        return html_lib.escape("" if value is None else str(value), quote=True)
 
     def _extract_total_taxes(self, invoice_data: Dict[str, Any]) -> Decimal:
         """Normalize total taxes value from ERPNext payloads."""
@@ -91,7 +98,7 @@ class ReceiptService:
         lines = []
 
         # Header
-        company_name = invoice_data.get("company", "Company Name")
+        company_name = invoice_data.get("company", DEFAULT_COMPANY_NAME)
         lines.append(self._center_text(company_name, width))
         lines.append(self._center_text("=" * (width // 2), width))
 
@@ -196,10 +203,10 @@ class ReceiptService:
         Returns:
             HTML formatted receipt
         """
-        company_name = invoice_data.get("company", "Company Name")
-        invoice_name = invoice_data.get("name", "N/A")
-        customer_name = invoice_data.get("customer_name", invoice_data.get("customer", "Walk-in"))
-        posting_date = invoice_data.get("posting_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        company_name = self._escape_html(invoice_data.get("company", DEFAULT_COMPANY_NAME))
+        invoice_name = self._escape_html(invoice_data.get("name", "N/A"))
+        customer_name = self._escape_html(invoice_data.get("customer_name", invoice_data.get("customer", "Walk-in")))
+        posting_date = self._escape_html(invoice_data.get("posting_date", datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
         html = f"""
         <!DOCTYPE html>
@@ -248,7 +255,7 @@ class ReceiptService:
 
         items = invoice_data.get("items", [])
         for item in items:
-            item_name = item.get("item_name", item.get("item_code", "Unknown"))
+            item_name = self._escape_html(item.get("item_name", item.get("item_code", "Unknown")))
             qty = self._to_decimal(item.get("qty", 0))
             rate = self._to_decimal(item.get("rate", 0))
             amount_raw = item.get("amount")
@@ -321,7 +328,7 @@ class ReceiptService:
             </div>
             '''
 
-        html += f"""
+        html += """
             <div class="center">
                 <p>Thank you for your business!</p>
                 <p>Visit us again soon!</p>
@@ -353,7 +360,7 @@ class ReceiptService:
         story = []
 
         # Company header
-        company_name = invoice_data.get("company", "Company Name")
+        company_name = invoice_data.get("company", DEFAULT_COMPANY_NAME)
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],

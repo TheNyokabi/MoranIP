@@ -108,6 +108,34 @@ export default function POSPage() {
 
     // Receipt preview state
     const [showReceiptPreview, setShowReceiptPreview] = useState(false)
+        const extractInvoiceIdFromCreateResponse = (result: any): string => {
+            const candidates = [
+                result?.data?.name,
+                result?.data?.id,
+                result?.data?.data?.name,
+                result?.data?.data?.id,
+                result?.name,
+                result?.id,
+            ]
+
+            for (const candidate of candidates) {
+                if (typeof candidate === 'string' && candidate.trim()) {
+                    const trimmed = candidate.trim()
+                    if (!['undefined', 'null', 'none'].includes(trimmed.toLowerCase())) return trimmed
+                }
+            }
+            return ''
+        }
+
+        const extractInvoiceDataFromCreateResponse = (result: any): any => {
+            // Backend commonly returns { data: <invoice> }
+            if (result && typeof result === 'object') {
+                if (result.data && typeof result.data === 'object') return result.data
+                return result
+            }
+            return result
+        }
+
     const [lastInvoiceId, setLastInvoiceId] = useState<string>('')
 
     // Accessibility state
@@ -406,6 +434,14 @@ export default function POSPage() {
 
     // Add to cart
     const addToCart = (item: POSItem) => {
+        // DEBUG: Log item being added to cart
+        console.log('[POS DEBUG] Adding item to cart:', {
+            item_code: item.item_code,
+            item_name: item.item_name,
+            standard_rate: item.standard_rate,
+            stock_qty: item.stock_qty
+        })
+        
         const existing = cart.find(c => c.item_code === item.item_code)
         if (existing) {
             setCart(cart.map(c =>
@@ -414,13 +450,15 @@ export default function POSPage() {
                     : c
             ))
         } else {
-            setCart([...cart, {
+            const newCartItem = {
                 item_code: item.item_code,
                 item_name: item.item_name,
                 qty: 1,
                 rate: item.standard_rate,
                 total: item.standard_rate
-            }])
+            }
+            console.log('[POS DEBUG] New cart item created:', newCartItem)
+            setCart([...cart, newCartItem])
         }
     }
 
@@ -502,18 +540,30 @@ export default function POSPage() {
             }
 
             const result = await posApi.createInvoice(token, invoice)
-            // Backend returns {data: POSInvoice}, extract inner data
-            const invoiceData = (result as any).data || result
+            
+            // Debug: Log the actual response structure
+            console.log('[POS M-Pesa] Invoice creation result:', result)
+            
+            const invoiceData = extractInvoiceDataFromCreateResponse(result)
+            const invoiceId = extractInvoiceIdFromCreateResponse(result)
+            console.log('[POS M-Pesa] Final invoiceId:', invoiceId)
+
+            if (!invoiceId) {
+                console.error('[POS M-Pesa] Missing invoice id. Full result:', result)
+                toast.error('Invoice created but no invoice id returned. Please check backend response.')
+                return
+            }
+            
             setLastInvoice(invoiceData)
-            setLastInvoiceId(invoiceData.name)
+            setLastInvoiceId(invoiceId)
             clearCart()
             setLoyaltyDiscount(0)
             setProcessing(false)
 
-            toast.success(`M-Pesa payment confirmed! Invoice: ${result.name}`)
+            toast.success(`M-Pesa payment confirmed! Invoice: ${invoiceId}`)
 
             // Show receipt preview
-            setShowReceiptPreview(true)
+            setTimeout(() => setShowReceiptPreview(true), 0)
         } catch (error: any) {
             toast.error(error.message || "Failed to create invoice after payment")
             setProcessing(false)
@@ -536,6 +586,13 @@ export default function POSPage() {
             const amountTenderedUsed = paymentMethodUsed === 'Cash' ? amountTendered : 0
             const changeAmountUsed = paymentMethodUsed === 'Cash' ? changeAmount : 0
 
+            // DEBUG: Log cart items before creating invoice
+            console.log('[POS DEBUG] Cart items before invoice creation:')
+            cart.forEach((item, idx) => {
+                console.log(`  [${idx}] ${item.item_code}: qty=${item.qty}, rate=${item.rate}, total=${item.total}`)
+            })
+            console.log('[POS DEBUG] Cart totals: subtotal=${cartTotal}, vat=${cartVat}, grand_total=${cartGrandTotal}')
+
             const invoice: POSInvoiceRequest = {
                 customer: selectedCustomer || 'Walk-in Customer', // Use selected customer or default
                 customer_type: customerType as any,
@@ -553,18 +610,37 @@ export default function POSPage() {
                 }]
             }
 
+            // DEBUG: Log the invoice payload being sent
+            console.log('[POS DEBUG] Invoice payload being sent to backend:', JSON.stringify(invoice, null, 2))
+
             const result = await posApi.createInvoice(token, invoice)
-            // Backend returns {data: POSInvoice}, extract inner data
-            const invoiceData = (result as any).data || result
+            
+            // Debug: Log the actual response structure
+            console.log('[POS] Invoice creation result:', result)
+            console.log('[POS] Result type:', typeof result)
+            console.log('[POS] Result keys:', Object.keys(result || {}))
+            
+            const invoiceData = extractInvoiceDataFromCreateResponse(result)
+            console.log('[POS] Extracted invoiceData:', invoiceData)
+            console.log('[POS] invoiceData.name:', invoiceData?.name)
+            console.log('[POS] invoiceData.id:', invoiceData?.id)
+            
+            const invoiceId = extractInvoiceIdFromCreateResponse(result)
+            console.log('[POS] Final invoiceId:', invoiceId)
+            
+            if (!invoiceId) {
+                console.error('[POS] WARNING: Invoice ID is empty! Full result:', JSON.stringify(result, null, 2))
+                toast.error('Invoice created but no invoice id returned. Receipt printing is unavailable.')
+                return
+            }
+            
             setLastInvoice(invoiceData)
+            setLastInvoiceId(invoiceId)
 
             // Capture payment context for the success screen before the cart resets
             setLastPaymentMethod(paymentMethodUsed)
             setLastAmountTendered(amountTenderedUsed)
             setLastChangeAmount(changeAmountUsed)
-
-            // Store invoice ID for receipt preview
-            setLastInvoiceId(invoiceData.name)
 
             // Refresh data
             const [summaryRes, invoicesRes] = await Promise.all([
@@ -577,9 +653,13 @@ export default function POSPage() {
             // Clear cart
             clearCart()
 
-            // Close confirmation modal and show success modal
-            setShowConfirmationModal(false)
-            setShowSuccessModal(true)
+            // IMPORTANT: Use setTimeout to ensure state updates are processed before showing modal
+            // This prevents the modal from rendering with stale/undefined invoiceId
+            setTimeout(() => {
+                // Close confirmation modal and show success modal
+                setShowConfirmationModal(false)
+                setShowSuccessModal(true)
+            }, 0)
 
         } catch (error: any) {
             console.error('Failed to process sale:', error)
@@ -868,13 +948,14 @@ export default function POSPage() {
                                         const hasStock = item.stock_qty !== undefined
                                         const isOutOfStock = hasStock && item.stock_qty === 0
                                         const isLowStock = hasStock && item.stock_qty! > 0 && item.stock_qty! <= 5
+                                        const hasZeroRate = item.standard_rate === 0
 
                                         return (
                                             <button
                                                 key={item.item_code}
                                                 onClick={() => !isOutOfStock && addToCart(item)}
                                                 disabled={isOutOfStock}
-                                                className={`p-3 sm:p-4 rounded-xl bg-muted/50 border border-border hover:bg-muted hover:border-primary/50 transition-all text-left group relative ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                className={`p-3 sm:p-4 rounded-xl bg-muted/50 border border-border hover:bg-muted hover:border-primary/50 transition-all text-left group relative ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''} ${hasZeroRate ? 'border-amber-500/50' : ''}`}
                                             >
                                                 {/* Stock Badge */}
                                                 {hasStock && (
@@ -891,7 +972,10 @@ export default function POSPage() {
                                                 </div>
                                                 <h3 className="font-medium text-foreground text-xs sm:text-sm mb-1 truncate">{item.item_name}</h3>
                                                 <p className="text-xs text-muted-foreground mb-1 sm:mb-2 truncate">{item.item_code}</p>
-                                                <p className="text-base sm:text-lg font-bold text-primary">KES {item.standard_rate.toLocaleString()}</p>
+                                                <p className={`text-base sm:text-lg font-bold ${hasZeroRate ? 'text-amber-500' : 'text-primary'}`}>
+                                                    KES {item.standard_rate.toLocaleString()}
+                                                    {hasZeroRate && <span className="text-xs ml-1">(No Price)</span>}
+                                                </p>
                                             </button>
                                         )
                                     })}

@@ -37,7 +37,20 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
 
   // Load receipt on mount and when format/language changes
   useEffect(() => {
-    if (invoiceId && token) {
+    const normalized = (typeof invoiceId === 'string' ? invoiceId.trim() : '')
+    const invalid = !normalized || ['undefined', 'null', 'none'].includes(normalized.toLowerCase())
+
+    if (invalid) {
+      toast({
+        title: 'Missing invoice',
+        description: 'Invoice ID is missing or invalid. Create/select an invoice first.',
+        variant: 'destructive',
+      })
+      if (onClose) onClose()
+      return
+    }
+
+    if (token) {
       loadReceipt()
     }
   }, [invoiceId, format, language, token])
@@ -45,9 +58,10 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
   const loadReceipt = async () => {
     setLoading(true)
     try {
+      const normalized = (typeof invoiceId === 'string' ? invoiceId.trim() : '')
       const url = format === 'thermal'
-        ? `/pos/receipts/${invoiceId}/thermal?width=${thermalWidth}&language=${language}`
-        : `/pos/receipts/${invoiceId}?format=${format}&language=${language}`
+        ? `/pos/receipts/${normalized}/thermal?width=${thermalWidth}&language=${language}`
+        : `/pos/receipts/${normalized}?format=${format}&language=${language}`
 
       const response = await apiFetch(url, {}, token)
       setReceiptData(response as ReceiptData)
@@ -235,10 +249,14 @@ export function ReceiptPreview({ invoiceId, onClose }: ReceiptPreviewProps) {
 
     if (format === 'html') {
       return (
-        <div
-          className="border rounded-lg p-4 max-h-96 overflow-auto bg-white"
-          dangerouslySetInnerHTML={{ __html: receiptData.content }}
-        />
+        <div className="border rounded-lg overflow-hidden bg-white">
+          <iframe
+            title={`Receipt ${invoiceId}`}
+            className="w-full h-96"
+            sandbox="allow-same-origin"
+            srcDoc={receiptData.content}
+          />
+        </div>
       )
     } else if (format === 'thermal') {
       return (

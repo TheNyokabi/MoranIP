@@ -1080,23 +1080,47 @@ export const posApi = {
         apiFetch(`/api/pos/analytics/customers${fromDate ? `?from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}${limit ? `&limit=${limit}` : ''}`, {}, token),
 
     // Receipts
-    getReceipt: (token: string, invoiceId: string, format?: string, language?: string): Promise<string> =>
-        apiFetch(`/pos/receipts/${invoiceId}?format=${format || 'html'}&language=${language || 'en'}`, {}, token).then((res: any) => res?.content ?? ''),
+    getReceipt: (token: string, invoiceId: string, format?: string, language?: string): Promise<string> => {
+        const normalized = (typeof invoiceId === 'string' ? invoiceId.trim() : '')
+        if (!normalized || ['undefined', 'null', 'none'].includes(normalized.toLowerCase())) {
+            throw new ApiError(400, 'Invoice ID is missing or invalid')
+        }
+        return apiFetch(`/pos/receipts/${normalized}?format=${format || 'html'}&language=${language || 'en'}`, {}, token)
+            .then((res: any) => res?.content ?? '')
+    },
 
-    getThermalReceipt: (token: string, invoiceId: string, width?: number, language?: string): Promise<string> =>
-        apiFetch(`/pos/receipts/${invoiceId}/thermal?width=${width || 80}&language=${language || 'en'}`, {}, token).then((res: any) => res?.content ?? ''),
+    getThermalReceipt: (token: string, invoiceId: string, width?: number, language?: string): Promise<string> => {
+        const normalized = (typeof invoiceId === 'string' ? invoiceId.trim() : '')
+        if (!normalized || ['undefined', 'null', 'none'].includes(normalized.toLowerCase())) {
+            throw new ApiError(400, 'Invoice ID is missing or invalid')
+        }
+        return apiFetch(`/pos/receipts/${normalized}/thermal?width=${width || 80}&language=${language || 'en'}`, {}, token)
+            .then((res: any) => res?.content ?? '')
+    },
 
     emailReceipt: (token: string, invoiceId: string, email: string, language?: string): Promise<any> =>
-        apiFetch(`/pos/receipts/${invoiceId}/email`, {
+        (() => {
+            const normalized = (typeof invoiceId === 'string' ? invoiceId.trim() : '')
+            if (!normalized || ['undefined', 'null', 'none'].includes(normalized.toLowerCase())) {
+                throw new ApiError(400, 'Invoice ID is missing or invalid')
+            }
+            return apiFetch(`/pos/receipts/${normalized}/email`, {
             method: 'POST',
             body: JSON.stringify({ email, language: language || 'en' })
-        }, token),
+            }, token)
+        })(),
 
     smsReceipt: (token: string, invoiceId: string, phoneNumber: string, language?: string): Promise<any> =>
-        apiFetch(`/pos/receipts/${invoiceId}/sms`, {
+        (() => {
+            const normalized = (typeof invoiceId === 'string' ? invoiceId.trim() : '')
+            if (!normalized || ['undefined', 'null', 'none'].includes(normalized.toLowerCase())) {
+                throw new ApiError(400, 'Invoice ID is missing or invalid')
+            }
+            return apiFetch(`/pos/receipts/${normalized}/sms`, {
             method: 'POST',
             body: JSON.stringify({ phone_number: phoneNumber, language: language || 'en' })
-        }, token),
+            }, token)
+        })(),
 
     bulkPrintReceipts: (token: string, invoiceIds: string[], format?: string, width?: number, language?: string): Promise<any> =>
         apiFetch('/pos/receipts/bulk-print', {

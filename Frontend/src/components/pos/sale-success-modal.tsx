@@ -61,15 +61,36 @@ export function SaleSuccessModal({
     const [showEmailInput, setShowEmailInput] = useState(false);
     const [showSmsInput, setShowSmsInput] = useState(false);
 
+    const normalizeInvoiceId = (value: string) => (typeof value === 'string' ? value.trim() : '')
+    const isInvalidInvoiceId = (value: string) => {
+        const normalized = normalizeInvoiceId(value)
+        return !normalized || ['undefined', 'null', 'none'].includes(normalized.toLowerCase())
+    }
+
     const handlePrint = async () => {
+        if (isInvalidInvoiceId(invoiceId)) {
+            toast.error('Invoice ID is missing. Cannot print receipt.');
+            return;
+        }
+        
         setIsPrinting(true);
         try {
             // Get thermal receipt for printing
             const receipt = await posApi.getThermalReceipt(token, invoiceId);
 
+                        const safeReceipt = receipt
+                                .replaceAll('&', '&amp;')
+                                .replaceAll('<', '&lt;')
+                                .replaceAll('>', '&gt;')
+
             // Create print window
             const printWindow = window.open('', '_blank');
-            if (printWindow) {
+                        if (!printWindow) {
+                                toast.error('Pop-up blocked. Allow pop-ups to print receipts.');
+                                return;
+                        }
+
+                        if (printWindow) {
                 printWindow.document.write(`
           <html>
             <head>
@@ -80,7 +101,7 @@ export function SaleSuccessModal({
               </style>
             </head>
             <body>
-              <pre>${receipt}</pre>
+                            <pre>${safeReceipt}</pre>
               <script>window.print(); window.close();</script>
             </body>
           </html>
@@ -96,6 +117,11 @@ export function SaleSuccessModal({
     };
 
     const handleEmail = async () => {
+        if (isInvalidInvoiceId(invoiceId)) {
+            toast.error('Invoice ID is missing. Cannot send email.');
+            return;
+        }
+        
         if (!emailAddress) {
             setShowEmailInput(true);
             return;
@@ -115,6 +141,11 @@ export function SaleSuccessModal({
     };
 
     const handleSms = async () => {
+        if (isInvalidInvoiceId(invoiceId)) {
+            toast.error('Invoice ID is missing. Cannot send SMS.');
+            return;
+        }
+        
         if (!phoneNumber) {
             setShowSmsInput(true);
             return;
@@ -134,6 +165,11 @@ export function SaleSuccessModal({
     };
 
     const handleDownload = async () => {
+        if (isInvalidInvoiceId(invoiceId)) {
+            toast.error('Invoice ID is missing. Cannot download receipt.');
+            return;
+        }
+        
         setIsDownloading(true);
         try {
             const receipt = await posApi.getReceipt(token, invoiceId, 'html');
