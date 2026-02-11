@@ -19,6 +19,9 @@ from .routers import accounting, crm, hr, manufacturing, projects, paint  # Modu
 from .routers import tenant_setup  # Tenant setup router
 from .routers import reports, commissions, dashboard, files, notifications  # Phase 5 routers
 from .dependencies.auth import oauth2_scheme
+from Engine.Collections.router import router as collections_router
+from Engine.Collections.Billing.router import router as billing_router
+
 
 app = FastAPI(title="MoranERP API Gateway")
 
@@ -43,6 +46,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(collections_router)
+app.include_router(billing_router)
 
 # Add POS cache middleware after auth router
 app.add_middleware(POSCacheMiddleware, cache_service=cache_service)

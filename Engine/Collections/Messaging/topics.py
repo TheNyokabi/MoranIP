@@ -1,0 +1,9 @@
+INVOICE_EVENTS_TOPIC = "billing.invoice.events"
+SUBSCRIPTION_EVENTS_TOPIC = "billing.subscription.events"
+ACCOUNTING_EVENTS_TOPIC = "accounting.events"
+
+ALL_TOPICS = [
+    INVOICE_EVENTS_TOPIC,
+    SUBSCRIPTION_EVENTS_TOPIC,
+    ACCOUNTING_EVENTS_TOPIC,
+]

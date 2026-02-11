@@ -253,8 +253,8 @@ monitoring/*.log
 !.env.sample
 
 # Allow specific config files
-!docker-compose.yml
-!Dockerfile
+docker-compose.yml
+Dockerfile
 !*.example
 Engine/ERPNext/erpnext
 Engine/ERPNext/frappe
